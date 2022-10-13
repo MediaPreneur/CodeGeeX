@@ -205,6 +205,6 @@ class AdamWeightDecayOp(Optimizer):
             new_state.requires_aggr = old_param.requires_aggr
             if old_param.cache_shape:
                 new_state.cache_shape = old_param.cache_shape
-            new_state.name = prefix + '.' + new_state.name
+            new_state.name = f'{prefix}.{new_state.name}'
             new.append(new_state)
         return ParameterTuple(new)

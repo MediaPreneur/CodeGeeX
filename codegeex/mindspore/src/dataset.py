@@ -176,10 +176,16 @@ def get_code_data_train(code_data_path, args_opt, process_fn=None, scale=1, skip
 
     for dir in sorted(os.listdir(code_data_path)):
         sub_dirs = os.listdir(os.path.join(code_data_path, dir))
-        for sub_dir in sub_dirs:
-            if os.path.exists(os.path.join(code_data_path, dir, sub_dir, 'data.mdb')) and os.path.exists(
-                    os.path.join(code_data_path, dir, sub_dir, 'lock.mdb')):
-                paths.append(os.path.join(code_data_path, dir, sub_dir))
+        paths.extend(
+            os.path.join(code_data_path, dir, sub_dir)
+            for sub_dir in sub_dirs
+            if os.path.exists(
+                os.path.join(code_data_path, dir, sub_dir, 'data.mdb')
+            )
+            and os.path.exists(
+                os.path.join(code_data_path, dir, sub_dir, 'lock.mdb')
+            )
+        )
 
     for full_path in paths:
         if os.path.isdir(full_path):
@@ -204,10 +210,16 @@ def get_code_data_eval(code_data_path, args_opt, process_fn=None, scale=1):
 
     for dir in sorted(os.listdir(code_data_path)):
         sub_dirs = os.listdir(os.path.join(code_data_path, dir))
-        for sub_dir in sub_dirs:
-            if os.path.exists(os.path.join(code_data_path, dir, sub_dir, 'data.mdb')) and os.path.exists(
-                    os.path.join(code_data_path, dir, sub_dir, 'lock.mdb')):
-                paths.append(os.path.join(code_data_path, dir, sub_dir))
+        paths.extend(
+            os.path.join(code_data_path, dir, sub_dir)
+            for sub_dir in sub_dirs
+            if os.path.exists(
+                os.path.join(code_data_path, dir, sub_dir, 'data.mdb')
+            )
+            and os.path.exists(
+                os.path.join(code_data_path, dir, sub_dir, 'lock.mdb')
+            )
+        )
 
     for full_path in paths:
         if os.path.isdir(full_path):

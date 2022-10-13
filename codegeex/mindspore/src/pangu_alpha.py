@@ -251,11 +251,9 @@ class PanGuHead(Cell):
 
     def construct(self, state, embed):
         state = P.Reshape()(state, (-1, self.hidden_size))
-        # output logits over vocabulary [bs*seq_length, vocab_size]
-        logits = self.matmul(
+        return self.matmul(
             self.cast(state, self.dtype), self.cast(embed, self.dtype)
         )
-        return logits
 
 
 def set_parallel_configure_for_layer(
@@ -489,8 +487,7 @@ class PanguAlphaModel(nn.Cell):
                   init_reset=True, batch_valid_length=None):
         output_states, word_table = self.backbone(input_ids, input_position, attention_mask,
                                                   init_reset, batch_valid_length)
-        logits = self.head(output_states, word_table)
-        return logits
+        return self.head(output_states, word_table)
 
 
 class PanGUAlphaWithLoss(Cell):
@@ -538,10 +535,8 @@ class PanGUAlphaWithLoss(Cell):
         labels = self.slice(input_ids, (0, 1), (self.batch_size, self.len + 1), (1, 1))
         labels = P.Reshape()(labels, (-1,))
         input_mask = P.Reshape()(input_mask, (-1,))
-        # P.Print()("==input_mask is:", input_mask)
-        output = self.loss(logits, labels, input_mask)
         # P.Print()("==net output is:", output)
-        return output
+        return self.loss(logits, labels, input_mask)
 
 
 class EvalNet(nn.Cell):
@@ -590,8 +585,7 @@ class EvalNet(nn.Cell):
         # P.Print()("==index_is:", index, ",shape is:", index.shape)
         logits = self.gather(logits, index, 0)
         logits = logits.view(bs, 1, -1)
-        log_probs = self.log_softmax(logits)
-        return log_probs
+        return self.log_softmax(logits)
 
 
 class LogitsNet(nn.Cell):
@@ -633,10 +627,13 @@ class LogitsNet(nn.Cell):
                 attention_mask = self.get_attention_mask(input_mask)
         input_position = F.tuple_to_array(F.make_range(seq_length))
         input_position = P.Tile()(input_position, (bs, 1))
-        logits = self.backbone(input_ids, input_position, attention_mask,
-                               init_reset, batch_valid_length)
-
-        return logits
+        return self.backbone(
+            input_ids,
+            input_position,
+            attention_mask,
+            init_reset,
+            batch_valid_length,
+        )
 
 
 class PanGUAlphaWithFinetuneLoss(Cell):
@@ -684,9 +681,5 @@ class PanGUAlphaWithFinetuneLoss(Cell):
         labels = self.slice(input_ids, (0, 1), (self.batch_size, self.len + 1), (1, 1))
         labels = P.Reshape()(labels, (-1,))
         input_mask = P.Reshape()(loss_mask, (-1,))
-        # P.Print()("===labels: ", labels, ", shape: ", labels.shape)
-        # input_mask = P.Reshape()(input_mask, (-1,))
-        # P.Print()("===input_mask: ", input_mask, ", shape: ", input_mask.shape)
-        output = self.loss(logits, labels, input_mask)
         # P.Print()("==net output is:", output)
-        return output
+        return self.loss(logits, labels, input_mask)

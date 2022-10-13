@@ -113,11 +113,11 @@ def generate_samples_input_from_file(model):
         input_count = len(all_raw_text)
         input_pos = 0
         if args.sample_output_file is None:
-            sample_output_file = args.sample_input_file + ".out"
+            sample_output_file = f"{args.sample_input_file}.out"
             print(
-                "`sample-output-file` not specified, setting "
-                "it to {}".format(sample_output_file)
+                f"`sample-output-file` not specified, setting it to {sample_output_file}"
             )
+
         else:
             sample_output_file = args.sample_output_file
         fname_out = open(sample_output_file, "w+")
@@ -191,27 +191,29 @@ def generate_samples_input_from_file(model):
                     context_tokens = context_tokens_tensor.cpu().numpy().tolist()
 
             token_stream = get_token_stream(model, [context_tokens])
-            for _, decode_tokens in enumerate(token_stream):
+            for decode_tokens in token_stream:
                 pass
 
-            if mpu.get_tensor_model_parallel_rank() == 0:
-                if mpu.is_pipeline_first_stage():
-                    os.system("clear")
-                    print("\nContext:", raw_text, flush=True)
+            if (
+                mpu.get_tensor_model_parallel_rank() == 0
+                and mpu.is_pipeline_first_stage()
+            ):
+                os.system("clear")
+                print("\nContext:", raw_text, flush=True)
 
-                    fname_out.write("\nContext:")
-                    fname_out.write(raw_text)
+                fname_out.write("\nContext:")
+                fname_out.write(raw_text)
 
-                    decode_tokens, _ = decode_tokens
-                    decode_tokens = decode_tokens[0].cpu().numpy().tolist()
-                    trim_decode_tokens = tokenizer.detokenize(decode_tokens)[
-                                         raw_text_len:
-                                         ]
-                    print("\nMegatron-LM:", trim_decode_tokens, flush=True)
+                decode_tokens, _ = decode_tokens
+                decode_tokens = decode_tokens[0].cpu().numpy().tolist()
+                trim_decode_tokens = tokenizer.detokenize(decode_tokens)[
+                                     raw_text_len:
+                                     ]
+                print("\nMegatron-LM:", trim_decode_tokens, flush=True)
 
-                    fname_out.write("\n\nMegatron-LM:")
-                    fname_out.write(trim_decode_tokens)
-                    fname_out.write("\n")
+                fname_out.write("\n\nMegatron-LM:")
+                fname_out.write(trim_decode_tokens)
+                fname_out.write("\n")
 
             raw_text = None
             context_count += 1
@@ -243,9 +245,7 @@ def generate_samples_eval(model, context, max_gen_length, eos_token_id):
 
     decode_tokens, _ = decode_tokens
     decode_tokens = decode_tokens[0].cpu().numpy().tolist()
-    trim_decode_tokens = tokenizer.detokenize(decode_tokens)[raw_text_len:]
-
-    return trim_decode_tokens
+    return tokenizer.detokenize(decode_tokens)[raw_text_len:]
 
 
 def generate_samples_interactive_code_contest(model, print_frequency=10):
@@ -284,10 +284,7 @@ def generate_samples_interactive_code_contest(model, print_frequency=10):
 
                 raw_text_len = len(raw_text)
 
-                if "stop" in raw_text:
-                    # terminate_runs = 1
-                    pass
-                else:
+                if "stop" not in raw_text:
                     context_tokens = tokenizer.tokenize(raw_text)
                     context_length = len(context_tokens)
 
@@ -509,8 +506,7 @@ def generate_samples_unconditional(model):
                 tokens = tokens[1: length - 1]
                 text = tokenizer.detokenize(tokens)
                 is_finished = length < args.seq_length - 1
-                datum = {"text": text, "length": length - 1, "finished": is_finished}
-                yield datum
+                yield {"text": text, "length": length - 1, "finished": is_finished}
                 ctr += 1
                 if ctr >= num_samples:
                     break
@@ -651,8 +647,10 @@ def expand_beams(beams: List[Beam], num_beams: int, model) -> List[Beam]:
         this_tokens = tokens[i]
         this_scores = scores[i]
 
-        for token, score in zip(this_tokens, this_scores):
-            all_beams.append(Beam(beams[i].tokens + [token], beams[i].score + score))
+        all_beams.extend(
+            Beam(beams[i].tokens + [token], beams[i].score + score)
+            for token, score in zip(this_tokens, this_scores)
+        )
 
     return all_beams
 
@@ -687,11 +685,10 @@ def beam_search(model, context_tokens, num_beams: int):
                     finished_beams.append(beam)
                 else:
                     next_beams.append(beam)
+            elif beam.tokens[-1] == tokenizer.eod:
+                finished_beams.append(beam)
             else:
-                if beam.tokens[-1] == tokenizer.eod:
-                    finished_beams.append(beam)
-                else:
-                    next_beams.append(beam)
+                next_beams.append(beam)
         # only keep top-k beams
         next_beams.sort(key=lambda b: b.score, reverse=True)
         beams = next_beams[:num_beams]
@@ -702,14 +699,6 @@ def beam_search(model, context_tokens, num_beams: int):
             finished_beams.sort(key=lambda b: b.score, reverse=True)
             finished_beams = finished_beams[:num_beams]
             return finished_beams  # return finished beams with highest scores
-            # stop if all currently expanding beams has a score lower than the minimal score of finished ones
-            min_score = min([b.score for b in finished_beams])
-            if min_score >= beams[0].score:
-                break
-            else:
-                print(f"we have got enough finished beams, but the minimal score is {min_score}")
-                print(f"and the maximum searching score is {beams[0].score}")
-
     # return top-k finished and unfinished beams
     all_beams = finished_beams + beams
     all_beams.sort(key=lambda b: b.score, reverse=True)
@@ -776,7 +765,7 @@ def generate_nuclear_sampling(model, context_tokens, num_samples: int, temperatu
     context_len = len(context_tokens)
     finished_handles = []
 
-    while len(handles) > 0 and context_len < args.seq_length:
+    while handles and context_len < args.seq_length:
         expanded_handles = expand_handles(handles, temperature, top_p, top_k, model)
 
         new_handles = []
@@ -826,10 +815,7 @@ def forward_step(
         output_tensor, layer_past = output_tensor
 
     args.seq_length = orig_seq_length
-    if get_key_value:
-        return output_tensor, layer_past
-
-    return output_tensor
+    return (output_tensor, layer_past) if get_key_value else output_tensor
 
 
 def get_token_stream(
@@ -936,11 +922,7 @@ def sample_sequence_batch(
 
         # added eos_id to support the function generate_samples_eval that passes
         # eos_id as an argument and needs termination when that id id found.
-        if hasattr(args, "eos_id"):
-            eos_id = args.eos_id
-        else:
-            eos_id = tokenizer.eod
-
+        eos_id = args.eos_id if hasattr(args, "eos_id") else tokenizer.eod
         counter = 0
         org_context_length = context_length
 
@@ -1092,11 +1074,7 @@ def sample_sequence_batch_beam(
 
         # added eos_id to support the function generate_samples_eval that passes
         # eos_id as an argument and needs termination when that id id found.
-        if hasattr(args, "eos_id"):
-            eos_id = args.eos_id
-        else:
-            eos_id = tokenizer.eod
-
+        eos_id = args.eos_id if hasattr(args, "eos_id") else tokenizer.eod
         counter = 0
         org_context_length = context_length
 
@@ -1119,9 +1097,7 @@ def sample_sequence_batch_beam(
             beam = beams[0]
             tokens_ = beam.tokens
             tokens_ = (tokens_ if tokens_[-1] != tokenizer.eod else tokens_[:-1])
-            tokens_warmup = []
-            for i in range(batch_size):
-                tokens_warmup.append(tokens_.copy())
+            tokens_warmup = [tokens_.copy() for _ in range(batch_size)]
             tokens, context_lengths = pad_batch(tokens_warmup, tokenizer.eod, args)
             tokens = torch.cuda.LongTensor(tokens)
             context_lengths = torch.cuda.LongTensor(context_lengths)

@@ -92,7 +92,6 @@ class ValidationLoss(Metric):
         self.tokens_count += 1
 
     def eval(self):
-        if not self.is_last_stage == 0:
+        if self.is_last_stage != 0:
             return 0
-        val_loss = sum(self.metric) / (self.tokens_count * self.data_length)
-        return val_loss
+        return sum(self.metric) / (self.tokens_count * self.data_length)

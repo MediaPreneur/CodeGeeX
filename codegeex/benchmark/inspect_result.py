@@ -77,16 +77,15 @@ def inspect_result(
         pass_at_k_outpath: str = None,
 ):
     if input_dir is not None:
-        input_files = glob.glob(input_dir + "/*_results.jsonl")
+        input_files = glob.glob(f"{input_dir}/*_results.jsonl")
     else:
         input_files = [input_file]
 
-    if output_dir is not None:
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-    else:
+    if output_dir is None:
         output_dir = "/"
 
+    elif not os.path.exists(output_dir):
+        os.makedirs(output_dir)
     pass_at_k_outs = []
     for input_file in input_files:
         result_stats = defaultdict(dict)
@@ -106,9 +105,7 @@ def inspect_result(
                         incompleted = True
                         break
                 if task_id not in result_stats.keys():
-                    default_stats = {}
-                    default_stats["task_id"] = task_id
-                    default_stats["n_sample"] = 0
+                    default_stats = {"task_id": task_id, "n_sample": 0}
                     for k in error_types[language_type]:
                         default_stats[k] = 0
 
@@ -233,9 +230,8 @@ def inspect_result(
                     else:
                         incompleted = True
                         break
-                else:
-                    if obj["passed"]:
-                        result_stats[task_id]["accepted"] += 1
+                elif obj["passed"]:
+                    result_stats[task_id]["accepted"] += 1
 
         if incompleted:
             print(f"Language not supported, aborted. {input_file}")

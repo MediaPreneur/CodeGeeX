@@ -33,4 +33,4 @@ if os.environ.get("RANK_ID") == 0:
     os.system(f"sudo chmod +777 -R {log_dir}")
 print("==========ret code is: ", ret, flush=True)
 if ret != 0:
-    raise RuntimeError("ret code is :" + str(ret))
+    raise RuntimeError(f"ret code is :{str(ret)}")

@@ -28,10 +28,7 @@ def is_code_generation_finished(text: str):
     """
     # end_words = ['\ndef', '\nclass', '\nif', '\n#', '\nprint', '<|endoftext|>']
     end_words = ['\n}']
-    for w in end_words:
-        if w in text:
-            return True
-    return False
+    return any(w in text for w in end_words)
 
 
 def cleanup_text(text: str):
@@ -107,23 +104,15 @@ def sampler(log_probs_revised, top_p, top_k_num, use_pynative=False, bad_words_i
             probs[i][top_p:] = 0
         # probs = sorted_logits[:top_p_num]
         p_args = index
-        # p_args = index[:top_p_num]
-        p = probs / probs.sum(axis=1).reshape(-1, 1)
-        # if top_p is set to 1.0, use top_k sampling
+            # if top_p is set to 1.0, use top_k sampling
+    elif use_pynative:
+        probs, p_args = P.TopK(sorted=True)(logits, top_k_num)
+        probs = probs.asnumpy()
+        p_args = p_args.asnumpy()
     else:
-        # Get the corresponding probs and indices
-        if use_pynative:
-            probs, p_args = P.TopK(sorted=True)(logits, top_k_num)
-            probs = probs.asnumpy()
-            p_args = p_args.asnumpy()
-        else:
-            probs, p_args = topk_fun(logits, top_k_num)
-        # probs = probs[0]
-        # p_args = p_args[0]
-        # Avoid rounding error
-        # if sum(probs) == 0:
-        #     probs = np.array([1 / top_k_num for _ in range(top_k_num)])
-        p = probs / probs.sum(axis=1).reshape(-1, 1)
+        probs, p_args = topk_fun(logits, top_k_num)
+    # p_args = index[:top_p_num]
+    p = probs / probs.sum(axis=1).reshape(-1, 1)
     return p, p_args
 
 
@@ -177,7 +166,7 @@ def generate_increment(model, origin_inputs, config, tokenizer, verbose=False):
         print("input_ids is ", input_ids)
 
     # Indicate the exact token position
-    current_index = valid_length - 1 if valid_length - 1 > 0 else 0
+    current_index = valid_length - 1 if valid_length > 1 else 0
     batch_valid_length = Tensor(np.array([current_index for _ in range(batch_size)]), mstype.int32)
     current_index = Tensor(np.array([current_index + i * seq_length for i in range(batch_size)]), mstype.int32)
     # For first graph, not_init should be false
@@ -197,9 +186,7 @@ def generate_increment(model, origin_inputs, config, tokenizer, verbose=False):
     comments_index = [2, ]  # '#': 2, ' #': 1303
     newline_index = [198, ]  # '\n': 198
     # A single loop generates one token, loop until reaching target seq_length or generating eod token
-    while valid_length < target_length:
-        if all(gen_end):
-            break
+    while valid_length < target_length and not all(gen_end):
         # Reshape the output logits
         logits = logits.asnumpy()
         log_probs = logits.reshape(batch_size, vocab_embedding_vocab_size)

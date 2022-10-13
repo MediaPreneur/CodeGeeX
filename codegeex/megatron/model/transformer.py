@@ -175,17 +175,17 @@ class ParallelSelfAttention(MegatronModule):
         value_layer, _ = self.value(hidden_states)
 
         new_query_layer_shape = query_layer.size()[:-1] + \
-                                (self.num_attention_heads_per_partition,
+                                    (self.num_attention_heads_per_partition,
                                  self.hidden_size_per_attention_head)
         query_layer = query_layer.view(*new_query_layer_shape)
 
         new_query_layer_shape = key_layer.size()[:-1] + \
-                                (self.num_attention_heads_per_partition,
+                                    (self.num_attention_heads_per_partition,
                                  self.hidden_size_per_attention_head)
         key_layer = key_layer.view(*new_query_layer_shape)
 
         new_query_layer_shape = value_layer.size()[:-1] + \
-                                (self.num_attention_heads_per_partition,
+                                    (self.num_attention_heads_per_partition,
                                  self.hidden_size_per_attention_head)
         value_layer = value_layer.view(*new_query_layer_shape)
 
@@ -301,7 +301,7 @@ class ParallelSelfAttention(MegatronModule):
 
         # # [sq, b, np, hn] --> [sq, b, hp]
         new_context_layer_shape = context_layer.size()[:-2] + \
-                                  (self.hidden_size_per_partition,)
+                                      (self.hidden_size_per_partition,)
         context_layer = context_layer.view(*new_context_layer_shape)
 
         # =================
@@ -396,17 +396,17 @@ class ParallelTopQuerySelfAttention(MegatronModule):
         value_layer, _ = self.value(hidden_states)
 
         new_query_layer_shape = query_layer.size()[:-1] + \
-                                (self.num_attention_heads_per_partition,
+                                    (self.num_attention_heads_per_partition,
                                  self.hidden_size_per_attention_head)
         query_layer = query_layer.view(*new_query_layer_shape)
 
         new_query_layer_shape = key_layer.size()[:-1] + \
-                                (self.num_attention_heads_per_partition,
+                                    (self.num_attention_heads_per_partition,
                                  self.hidden_size_per_attention_head)
         key_layer = key_layer.view(*new_query_layer_shape)
 
         new_query_layer_shape = value_layer.size()[:-1] + \
-                                (self.num_attention_heads_per_partition,
+                                    (self.num_attention_heads_per_partition,
                                  self.hidden_size_per_attention_head)
         value_layer = value_layer.view(*new_query_layer_shape)
 
@@ -523,7 +523,7 @@ class ParallelTopQuerySelfAttention(MegatronModule):
 
         # [sq, b, np, hn] --> [sq, b, hp]
         new_context_layer_shape = context_layer.size()[:-2] + \
-                                  (self.hidden_size_per_partition,)
+                                      (self.hidden_size_per_partition,)
         context_layer = context_layer.view(*new_context_layer_shape)
 
         # =================
@@ -579,7 +579,7 @@ class ParallelTransformerLayer(MegatronModule):
         self.layer_number = layer_number
 
         self.apply_residual_connection_post_layernorm \
-            = args.apply_residual_connection_post_layernorm
+                = args.apply_residual_connection_post_layernorm
 
         # Layernorm on the input data.
         self.input_layernorm = LayerNorm(
@@ -601,11 +601,7 @@ class ParallelTransformerLayer(MegatronModule):
             self.attention_upweight = args.attention_upweight
         else:
             self.attention_upweight = None
-        if hasattr(args, 'ln_fp16'):
-            self.ln_fp16 = args.ln_fp16
-        else:
-            self.ln_fp16 = False
-            # MLP
+        self.ln_fp16 = args.ln_fp16 if hasattr(args, 'ln_fp16') else False
         self.mlp = ParallelMLP(init_method,
                                output_layer_init_method)
 
@@ -626,7 +622,7 @@ class ParallelTransformerLayer(MegatronModule):
 
         # Self attention.
         attention_output, attention_bias = \
-            self.attention(layernorm_output,
+                self.attention(layernorm_output,
                            attention_mask,
                            layer_past=layer_past,
                            get_key_value=get_key_value,
@@ -700,7 +696,7 @@ class ParallelTopQueryLayer(MegatronModule):
         self.layer_number = layer_number
 
         self.apply_residual_connection_post_layernorm \
-            = args.apply_residual_connection_post_layernorm
+                = args.apply_residual_connection_post_layernorm
 
         # Layernorm on the input data.
         self.input_layernorm = LayerNorm(
@@ -720,11 +716,7 @@ class ParallelTopQueryLayer(MegatronModule):
             args.hidden_size,
             eps=args.layernorm_epsilon)
 
-        if hasattr(args, 'ln_fp16'):
-            self.ln_fp16 = args.ln_fp16
-        else:
-            self.ln_fp16 = False
-
+        self.ln_fp16 = args.ln_fp16 if hasattr(args, 'ln_fp16') else False
         # MLP
         self.mlp = ParallelMLP(init_method,
                                output_layer_init_method)
@@ -750,7 +742,7 @@ class ParallelTopQueryLayer(MegatronModule):
 
         # Self attention.
         attention_output, attention_bias = \
-            self.attention(layernorm_output,
+                self.attention(layernorm_output,
                            query_hidden_state,
                            attention_mask,
                            layer_past=layer_past,
@@ -832,7 +824,7 @@ class ParallelTransformer(MegatronModule):
         if self.num_unique_layers is None:
             self.num_unique_layers = self.num_layers
         assert self.num_layers % self.num_unique_layers == 0, \
-            'number of layers should be divisible by number of unique layers'
+                'number of layers should be divisible by number of unique layers'
         self.param_sharing_style = 'grouped'
 
         # Transformer layers.
@@ -849,11 +841,7 @@ class ParallelTransformer(MegatronModule):
             output_layer_init_method, self.num_unique_layers)
 
         # Final layer norm before output.
-        if hasattr(args, 'ln_fp16'):
-            self.ln_fp16 = args.ln_fp16
-        else:
-            self.ln_fp16 = False
-
+        self.ln_fp16 = args.ln_fp16 if hasattr(args, 'ln_fp16') else False
         self.final_layernorm = LayerNorm(
             args.hidden_size,
             eps=args.layernorm_epsilon)
@@ -906,12 +894,12 @@ class ParallelTransformer(MegatronModule):
         # Checks
         if layer_past is not None:
             assert get_key_value, \
-                'for not None values in layer_past, ' \
-                'expected get_key_value to be set'
+                    'for not None values in layer_past, ' \
+                    'expected get_key_value to be set'
         if get_key_value:
             assert not self.checkpoint_activations, \
-                'get_key_value does not work with ' \
-                'activation checkpointing'
+                    'get_key_value does not work with ' \
+                    'activation checkpointing'
 
         # data format change to avoid explicit tranposes : [b s h] --> [s b h]
         hidden_states = hidden_states.transpose(0, 1).contiguous()
@@ -943,12 +931,7 @@ class ParallelTransformer(MegatronModule):
         else:
             hidden_states_ = self.final_layernorm(hidden_states.float()).half()
 
-        #################################
-        # top query layer
-        #################################
-        past = None
-        if layer_past is not None:
-            past = layer_past[self.num_layers]
+        past = layer_past[self.num_layers] if layer_past is not None else None
         hidden_states = self.topQueryLayer(hidden_states_,
                                            query_hidden_state,
                                            attention_mask,

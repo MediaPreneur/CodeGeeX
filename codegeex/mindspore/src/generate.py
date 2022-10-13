@@ -26,7 +26,7 @@ from mindspore.ops import operations as P
 def topk_fun(logits, topk=5):
     """Get topk"""
     target_column = logits[0].tolist()
-    sorted_array = [(k, v) for k, v in enumerate(target_column)]
+    sorted_array = list(enumerate(target_column))
     sorted_array.sort(key=lambda x: x[1], reverse=True)
     topk_array = sorted_array[:topk]
     index, value = zip(*topk_array)
@@ -62,8 +62,7 @@ def sampler(log_probs_revised, top_p, top_k_num, use_pynative=False):
         # Get the corresponding probs and indices
         probs = sorted_logits[:top_p_num]
         p_args = index[:top_p_num]
-        p = probs / sum(probs)
-        # if top_p is set to 1.0, use top_k sampling
+            # if top_p is set to 1.0, use top_k sampling
     else:
         # Get the corresponding probs and indices
         if use_pynative:
@@ -74,10 +73,7 @@ def sampler(log_probs_revised, top_p, top_k_num, use_pynative=False):
             probs, p_args = topk_fun(logits, top_k_num)
         probs = probs[0]
         p_args = p_args[0]
-        # Avoid rounding error
-        # if sum(probs) == 0:
-        #     probs = np.array([1 / top_k_num for _ in range(top_k_num)])
-        p = probs / sum(probs)
+    p = probs / sum(probs)
     return p, p_args
 
 
@@ -127,7 +123,7 @@ def generate(model, origin_inputs, config, verbose=False):
         inputs = Tensor(input_ids, mstype.int32)
 
         # Indicate the exact token position
-        current_index = valid_length - 1 if valid_length - 1 > 0 else 0
+        current_index = valid_length - 1 if valid_length > 1 else 0
         current_index = Tensor([current_index], mstype.int32)
         # Call a single inference
         log_probs = model.predict(inputs, current_index)
@@ -207,7 +203,7 @@ def generate_increment(model, origin_inputs, config, verbose=False):
     print("input_ids is ", input_ids)
 
     # Indicate the exact token position
-    current_index = valid_length - 1 if valid_length - 1 > 0 else 0
+    current_index = valid_length - 1 if valid_length > 1 else 0
     batch_valid_length = Tensor(np.array([current_index]), mstype.int32)
     current_index = Tensor(np.array([current_index]), mstype.int32)
     # For first graph, not_init should be false

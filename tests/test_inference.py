@@ -25,10 +25,7 @@ def set_random_seed(seed):
 def model_provider():
     """Build the model."""
 
-    model = CodeGeeXModel(num_tokentypes=0,
-                          parallel_output=False)
-
-    return model
+    return CodeGeeXModel(num_tokentypes=0, parallel_output=False)
 
 
 def add_code_generation_args(parser):
@@ -173,7 +170,7 @@ def main():
             bad_ids=args.bad_ids,
         )
         is_finished = [False for _ in range(args.micro_batch_size)]
-        for i, generated in enumerate(token_stream):
+        for generated in token_stream:
             generated_tokens = generated[0]
             for j in range(args.micro_batch_size):
                 if is_finished[j]:

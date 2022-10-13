@@ -49,18 +49,15 @@ def _clip_grad(clip_type, clip_value, grad):
     if clip_type not in [0, 1]:
         return grad
     dt = F.dtype(grad)
-    # 0 for clip_by_value and 1 for clip_by_norm
-    if clip_type == 0:
-        new_grad = C.clip_by_value(
+    return (
+        C.clip_by_value(
             grad,
             F.cast(F.tuple_to_array((-clip_value,)), dt),
             F.cast(F.tuple_to_array((clip_value,)), dt),
         )
-    else:
-        new_grad = nn.ClipByNorm()(
-            grad, F.cast(F.tuple_to_array((clip_value,)), dt)
-        )
-    return new_grad
+        if clip_type == 0
+        else nn.ClipByNorm()(grad, F.cast(F.tuple_to_array((clip_value,)), dt))
+    )
 
 
 grad_scale = C.MultitypeFuncGraph("grad_scale")

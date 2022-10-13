@@ -16,7 +16,7 @@ def encode_whitespaces(text, start_extra_id: int, max_len: int):
         if acc_len == 0:
             return text
         if acc_len == 1:
-            return text + ' '
+            return f'{text} '
         assert acc_len <= max_len, f'Max whitespace run length {max_len}, but found {acc_len}'
         extra_id = start_extra_id - 2 + acc_len
         extra_token = f'<|extratoken_{extra_id}|>'
@@ -62,8 +62,8 @@ class Code13BDictionary(object):
             extra_token_ids: List[str] = None,
             pad_to_vocab_size: int = -1,
     ):
-        self._idx = dict()
-        self._count = dict()
+        self._idx = {}
+        self._count = {}
         self._num_symbols = 0
         self._symbols = []
 
@@ -89,7 +89,7 @@ class Code13BDictionary(object):
         if num_pad <= 0:
             return
         for i in range(1, num_pad + 1):
-            self._add_symbol("vocab_pad_token{}".format(i), 0)
+            self._add_symbol(f"vocab_pad_token{i}", 0)
 
     def _load_dict(self, dict_file: str):
         with open(dict_file, "r") as f:

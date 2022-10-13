@@ -61,12 +61,11 @@ def set_weight_decay(params):
     decay_filter = lambda x: 'layernorm' not in x.name.lower() and "bias" not in x.name.lower()
     decay_params = list(filter(decay_filter, params))
     other_params = list(filter(lambda x: not decay_filter(x), params))
-    group_params = [
+    return [
         {"params": decay_params, "weight_decay": 1e-1},
         {"params": other_params, "weight_decay": 0.0},
         {"order_params": params},
     ]
-    return group_params
 
 
 def add_checkpoint_callback_policy(args_param, callback, rank_id):
@@ -104,7 +103,7 @@ def set_parallel_context(args_opt):
     D.init()
     device_num = D.get_group_size()
     rank = D.get_rank()
-    print("rank_id is {}, device_num is {}".format(rank, device_num))
+    print(f"rank_id is {rank}, device_num is {device_num}")
     if device_num < 128:
         args_opt.optimizer_shard = 0
     context.reset_auto_parallel_context()
@@ -135,14 +134,15 @@ def run_train(args_opt):
         rank, device_num = set_parallel_context(args_opt)
     context.set_context(
         save_graphs=False,
-        save_graphs_path="/cache/graphs_of_device_id_" + str(rank),
+        save_graphs_path=f"/cache/graphs_of_device_id_{str(rank)}",
     )
 
-    # copy data from the cloud to the /cache/Data
-    cache_url = '/cache/Data/'
-    eval_cache_url = '/cache/EvalData/'
+
     if not args_opt.offline:
+        # copy data from the cloud to the /cache/Data
+        cache_url = '/cache/Data/'
         download_data(src_data_url=args_opt.data_url, tgt_data_path=cache_url, rank=rank)
+        eval_cache_url = '/cache/EvalData/'
         download_data(src_data_url=args_opt.eval_data_url, tgt_data_path=eval_cache_url, rank=rank)
     # Set model property
     model_parallel_num = args_opt.op_level_model_parallel_num
@@ -309,11 +309,18 @@ def run_train(args_opt):
         strategy = model.infer_train_layout(train_dataset=ds, sink_size=args_opt.sink_size)
         print("======start load_distributed checkpoint", flush=True)
         # For 2.6B and 13B models, the number of ckpt files is 512.
-        ckpt_file_list = [os.path.join(args_opt.load_ckpt_path, f"filerted_{ckpt_rank}.ckpt") for ckpt_rank in
-                          range(0, 512)]
+        ckpt_file_list = [
+            os.path.join(args_opt.load_ckpt_path, f"filerted_{ckpt_rank}.ckpt")
+            for ckpt_rank in range(512)
+        ]
+
         print(f"Loading from path {ckpt_file_list[0]}", flush=True)
         load_distributed_checkpoint(model.train_network, ckpt_file_list, strategy)
-    print("Dataset size: {}, actual_epoch_num: {}".format(ds.get_dataset_size(), actual_epoch_num), flush=True)
+    print(
+        f"Dataset size: {ds.get_dataset_size()}, actual_epoch_num: {actual_epoch_num}",
+        flush=True,
+    )
+
 
     try:
         model.train(10 if args_opt.profiling else actual_epoch_num, ds, callbacks=callback,
@@ -324,13 +331,18 @@ def run_train(args_opt):
             profiler.analyse()
             rank_id = rank
             if context.get_context("save_graphs"):
-                mox.file.make_dirs("s3://wudao-1/yyf/graphs_" + jobid)
-                mox.file.copy_parallel(src_url="/cache/graphs_of_device_id_" + str(rank_id),
-                                       dst_url="s3://wudao-1/yyf/graphs_" + jobid + "/" + str(rank_id))
+                mox.file.make_dirs(f"s3://wudao-1/yyf/graphs_{jobid}")
+                mox.file.copy_parallel(
+                    src_url=f"/cache/graphs_of_device_id_{str(rank_id)}",
+                    dst_url=f"s3://wudao-1/yyf/graphs_{jobid}/{str(rank_id)}",
+                )
+
             if rank_id % 8 == 0:
-                mox.file.make_dirs("s3://wudao-1/yyf/profiler_" + jobid)
-                mox.file.copy_parallel(src_url="/cache/profiler_data",
-                                       dst_url="s3://wudao-1/yyf/profiler_" + jobid + "/" + str(rank_id))
+                mox.file.make_dirs(f"s3://wudao-1/yyf/profiler_{jobid}")
+                mox.file.copy_parallel(
+                    src_url="/cache/profiler_data",
+                    dst_url=f"s3://wudao-1/yyf/profiler_{jobid}/{str(rank_id)}",
+                )
 
 
 if __name__ == "__main__":

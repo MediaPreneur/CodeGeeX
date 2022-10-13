@@ -33,7 +33,7 @@ def encode_whitespaces(text, start_extra_id: int, max_len: int):
         if acc_len == 0:
             return text
         if acc_len == 1:
-            return text + " "
+            return f"{text} "
         assert (
                 acc_len <= max_len
         ), f"Max whitespace run length {max_len}, but found {acc_len}"
@@ -102,18 +102,18 @@ def build_tokenizer(args):
         return tokenizer
 
     if args.rank == 0:
-        print("> building {} tokenizer ...".format(args.tokenizer_type), flush=True)
+        print(f"> building {args.tokenizer_type} tokenizer ...", flush=True)
 
     # Select and instantiate the tokenizer.
     assert args.vocab_file is not None
-    if args.tokenizer_type == "GPT2BPETokenizer":
-        assert args.merge_file is not None
-        tokenizer = _GPT2BPETokenizer(args.vocab_file, args.merge_file)
-    else:
+    if args.tokenizer_type != "GPT2BPETokenizer":
         raise NotImplementedError(
-            "{} tokenizer is not " "implemented.".format(args.tokenizer_type)
+            f"{args.tokenizer_type} tokenizer is not implemented."
         )
 
+
+    assert args.merge_file is not None
+    tokenizer = _GPT2BPETokenizer(args.vocab_file, args.merge_file)
     # Add vocab size.
     args.padded_vocab_size = _vocab_size_with_padding(tokenizer.vocab_size, args)
 
@@ -130,10 +130,10 @@ def _vocab_size_with_padding(orig_vocab_size, args):
         after += 1
     if args.rank == 0:
         print(
-            " > padded vocab (size: {}) with {} dummy tokens "
-            "(new size: {})".format(orig_vocab_size, after - orig_vocab_size, after),
+            f" > padded vocab (size: {orig_vocab_size}) with {after - orig_vocab_size} dummy tokens (new size: {after})",
             flush=True,
         )
+
     return after
 
 
@@ -167,38 +167,28 @@ class AbstractTokenizer(ABC):
 
     def detokenize(self, token_ids):
         raise NotImplementedError(
-            "detokenizer is not implemented for {} " "tokenizer".format(self.name)
+            f"detokenizer is not implemented for {self.name} tokenizer"
         )
 
     @property
     def cls(self):
-        raise NotImplementedError(
-            "CLS is not provided for {} " "tokenizer".format(self.name)
-        )
+        raise NotImplementedError(f"CLS is not provided for {self.name} tokenizer")
 
     @property
     def sep(self):
-        raise NotImplementedError(
-            "SEP is not provided for {} " "tokenizer".format(self.name)
-        )
+        raise NotImplementedError(f"SEP is not provided for {self.name} tokenizer")
 
     @property
     def pad(self):
-        raise NotImplementedError(
-            "PAD is not provided for {} " "tokenizer".format(self.name)
-        )
+        raise NotImplementedError(f"PAD is not provided for {self.name} tokenizer")
 
     @property
     def eod(self):
-        raise NotImplementedError(
-            "EOD is not provided for {} " "tokenizer".format(self.name)
-        )
+        raise NotImplementedError(f"EOD is not provided for {self.name} tokenizer")
 
     @property
     def mask(self):
-        raise NotImplementedError(
-            "MASK is not provided for {} " "tokenizer".format(self.name)
-        )
+        raise NotImplementedError(f"MASK is not provided for {self.name} tokenizer")
 
 
 class _GPT2BPETokenizer(AbstractTokenizer):

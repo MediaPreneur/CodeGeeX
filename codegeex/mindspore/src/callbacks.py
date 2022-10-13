@@ -56,7 +56,10 @@ class LossCallBack(Callback):
         self.sink_size = sink_size
 
         self.summary_writer = tb_writer
-        print("load has trained epoch :{} and step: {}".format(has_trained_epoch, has_trained_step), flush=True)
+        print(
+            f"load has trained epoch :{has_trained_epoch} and step: {has_trained_step}",
+            flush=True,
+        )
 
     def step_end(self, run_context):
         """
@@ -169,7 +172,7 @@ class SaveCheckpointCallback(Callback):
         self.syn_times = syn_times
 
         if not mox.file.exists(self.bucket):
-            print("Creating checkpoint bucket dir {}".format(self.bucket))
+            print(f"Creating checkpoint bucket dir {self.bucket}")
             mox.file.make_dirs(self.bucket)
 
     def step_end(self, run_context):

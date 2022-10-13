@@ -21,11 +21,7 @@ Path(tb_path).mkdir(parents=True, exist_ok=True)
 log_path_prefix_1 = os.path.join(args.work_dir, "logs")
 
 os.environ["LOG_PATH"] = tb_path
-if args.part is not None:
-    os.environ["PART"] = args.part
-else:
-    os.environ["PART"] = "-1"
-
+os.environ["PART"] = args.part if args.part is not None else "-1"
 print("=================RANK_TABLE_FILE: ", os.environ["RANK_TABLE_FILE"], flush=True)
 print("=================ms import done", flush=True)
 time.sleep(10)
@@ -38,4 +34,4 @@ if os.environ.get("RANK_ID") == 0:
     os.system(f"sudo chmod +777 -R {log_dir}")
 print("==========ret code is: ", ret, flush=True)
 if ret != 0:
-    raise RuntimeError("ret code is :" + str(ret))
+    raise RuntimeError(f"ret code is :{str(ret)}")

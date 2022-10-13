@@ -47,10 +47,7 @@ class LMDBDataset(Dataset):
                 row = pickle.loads(txn.get(key))
             except TypeError:
                 raise IndexError("Index out of range")
-            if self.process_fn:
-                return self.process_fn(row)
-            else:
-                return row
+            return self.process_fn(row) if self.process_fn else row
 
 
 class PadDataset(Dataset):
@@ -109,10 +106,7 @@ class TSVDataset(Dataset):
     def __init__(self, path, process_fn, with_heads=True, **kwargs):
         self.process_fn = process_fn
         with open(path, "r") as fin:
-            if with_heads:
-                self.heads = fin.readline().split("\t")
-            else:
-                self.heads = None
+            self.heads = fin.readline().split("\t") if with_heads else None
             self.items = [line.split("\t") for line in fin]
 
     def __len__(self):
@@ -145,10 +139,7 @@ class ConcatDataset(Dataset):
         super(ConcatDataset, self).__init__()
         assert len(datasets) > 0, "datasets should not be an empty iterable"
         self.datasets = datasets
-        if weights is None:
-            self.weights = [1] * len(self.datasets)
-        else:
-            self.weights = weights
+        self.weights = [1] * len(self.datasets) if weights is None else weights
         self.cumulative_sizes = self.cumsum(self.datasets, self.weights)
         self.skip_num = skip_num
         self.visited_times = 0

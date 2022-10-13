@@ -71,7 +71,7 @@ class PanguAlphaConfig:
     def __str__(self):
         info = "[PANGUALPHAConfig]" + "===" * 10 + "\n"
         for k, v in self.__dict__.items():
-            var_info = "{}:{}\n".format(k, v)
+            var_info = f"{k}:{v}\n"
             info += var_info
         info += "=" * 10
         return info
@@ -81,34 +81,18 @@ def set_parse(args_opt):
     r"""
        Set config according to the mode
     """
-    if args_opt.mode == "200B":
-        args_opt.embedding_size = 16384
-        args_opt.num_layers = 64
-        args_opt.num_heads = 128
-        if args_opt.per_batch_size == 0:
-            args_opt.per_batch_size = 1
-        args_opt.word_emb_dp = 0
-        if args_opt.run_type == "train":
-            args_opt.start_lr = 6e-5
-            args_opt.end_lr = 6e-6
-            args_opt.stage_num = 16
-            args_opt.micro_size = 32
-            args_opt.op_level_model_parallel_num = 16
-            if args_opt.optimizer_shard == 1:
-                args_opt.op_level_model_parallel_num = 8
-        elif args_opt.run_type == "predict":
-            args_opt.stage_num = 4
-            args_opt.micro_size = 1
-            args_opt.op_level_model_parallel_num = 16
-            if args_opt.optimizer_shard == 1:
-                args_opt.op_level_model_parallel_num = 8
-    elif args_opt.mode == "13B":
+    if args_opt.mode == "13B":
         args_opt.embedding_size = 5120
         args_opt.num_layers = 40
         args_opt.num_heads = 40
         args_opt.word_emb_dp = 0
         args_opt.op_level_model_parallel_num = 8
-        if args_opt.run_type == "train":
+        if args_opt.run_type == "predict":
+            args_opt.stage_num = 1
+            args_opt.micro_size = 1
+            if args_opt.per_batch_size == 0:
+                args_opt.per_batch_size = 1
+        elif args_opt.run_type == "train":
             args_opt.start_lr = 1e-4
             args_opt.end_lr = 1e-6
             # args_opt.start_lr = 5e-5
@@ -119,17 +103,17 @@ def set_parse(args_opt):
                 args_opt.per_batch_size = 8
             if args_opt.stage_num > 1:
                 args_opt.word_emb_dp = 0
-        elif args_opt.run_type == "predict":
-            args_opt.stage_num = 1
-            args_opt.micro_size = 1
-            if args_opt.per_batch_size == 0:
-                args_opt.per_batch_size = 1
     elif args_opt.mode == "2.6B":
         args_opt.embedding_size = 2560
         args_opt.num_layers = 32
         args_opt.num_heads = 32
         args_opt.op_level_model_parallel_num = 8
-        if args_opt.run_type == "train":
+        if args_opt.run_type == "predict":
+            args_opt.stage_num = 1
+            args_opt.micro_size = 1
+            if args_opt.per_batch_size == 0:
+                args_opt.per_batch_size = 1
+        elif args_opt.run_type == "train":
             args_opt.start_lr = 3e-6
             # args_opt.start_lr = 1e-4
             args_opt.end_lr = 1e-6
@@ -139,17 +123,40 @@ def set_parse(args_opt):
                 args_opt.per_batch_size = 16
             if args_opt.stage_num > 1:
                 args_opt.word_emb_dp = 0
-        elif args_opt.run_type == "predict":
-            args_opt.stage_num = 1
+    elif args_opt.mode == "200B":
+        args_opt.embedding_size = 16384
+        args_opt.num_layers = 64
+        args_opt.num_heads = 128
+        if args_opt.per_batch_size == 0:
+            args_opt.per_batch_size = 1
+        args_opt.word_emb_dp = 0
+        if args_opt.run_type == "predict":
+            args_opt.stage_num = 4
             args_opt.micro_size = 1
-            if args_opt.per_batch_size == 0:
-                args_opt.per_batch_size = 1
+            args_opt.op_level_model_parallel_num = (
+                8 if args_opt.optimizer_shard == 1 else 16
+            )
+
+        elif args_opt.run_type == "train":
+            args_opt.start_lr = 6e-5
+            args_opt.end_lr = 6e-6
+            args_opt.stage_num = 16
+            args_opt.micro_size = 32
+            args_opt.op_level_model_parallel_num = (
+                8 if args_opt.optimizer_shard == 1 else 16
+            )
+
     elif args_opt.mode == "base":
         args_opt.embedding_size = 768
         args_opt.num_layers = 12
         args_opt.num_heads = 12
         args_opt.op_level_model_parallel_num = 2
-        if args_opt.run_type == "train":
+        if args_opt.run_type == "predict":
+            args_opt.stage_num = 1
+            args_opt.micro_size = 1
+            if args_opt.per_batch_size == 0:
+                args_opt.per_batch_size = 1
+        elif args_opt.run_type == "train":
             args_opt.start_lr = 4e-4
             args_opt.end_lr = 1e-6
             args_opt.optimizer_shard = 1
@@ -159,17 +166,18 @@ def set_parse(args_opt):
                 args_opt.per_batch_size = 16
             if args_opt.stage_num > 1:
                 args_opt.word_emb_dp = 0
-        elif args_opt.run_type == "predict":
-            args_opt.stage_num = 1
-            args_opt.micro_size = 1
-            if args_opt.per_batch_size == 0:
-                args_opt.per_batch_size = 1
     elif args_opt.mode == "dev":
         args_opt.embedding_size = 2048
         args_opt.num_layers = 16
         args_opt.num_heads = 16
         args_opt.op_level_model_parallel_num = 4
-        if args_opt.run_type == "train":
+        if args_opt.run_type == "predict":
+            args_opt.stage_num = 1
+            args_opt.micro_size = 1
+            if args_opt.per_batch_size == 0:
+                args_opt.per_batch_size = 1
+
+        elif args_opt.run_type == "train":
             args_opt.start_lr = 1e-4
             args_opt.end_lr = 1e-6
             args_opt.optimizer_shard = 1
@@ -178,8 +186,3 @@ def set_parse(args_opt):
                 args_opt.per_batch_size = 16
             if args_opt.stage_num > 1:
                 args_opt.word_emb_dp = 0
-        elif args_opt.run_type == "predict":
-            args_opt.stage_num = 1
-            args_opt.micro_size = 1
-            if args_opt.per_batch_size == 0:
-                args_opt.per_batch_size = 1
