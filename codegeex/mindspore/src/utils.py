@@ -68,7 +68,7 @@ class FP32StateAdamWeightDecay(AdamWeightDecay):
             new_state.param_info = old_param.param_info.clone()
             new_state.is_init = False
             new_state.set_data(initializer(init, shape=old_param.shape, dtype=mstype.float32))
-            new_state.name = prefix + '.' + new_state.name
+            new_state.name = f'{prefix}.{new_state.name}'
             new.append(new_state)
         return ParameterTuple(new)
 
@@ -108,7 +108,7 @@ def _get_model_parallel_group(mp):
     stage_id = rank // per_stage_device_nums
     local_stage_rank_id = rank % per_stage_device_nums
     index = local_stage_rank_id // mp
-    group = range(0, mp)
+    group = range(mp)
     rank_str_list = [str(x + index * mp + stage_id * per_stage_device_nums) for x in group]
     rank_list_str = "-".join(rank_str_list)
     rank_list = [x + index * mp + stage_id * per_stage_device_nums for x in group]
@@ -126,7 +126,7 @@ def _get_pipeline_group():
     device_nums = get_group_size()
     per_stage_device_nums = device_nums // stage_nums
     local_stage_rank_id = rank % per_stage_device_nums
-    group = range(0, stage_nums)
+    group = range(stage_nums)
     rank_list = [local_stage_rank_id + x * per_stage_device_nums for x in group]
     rank_str_list = [str(local_stage_rank_id + x * per_stage_device_nums) for x in group]
     rank_list_str = "-".join(rank_str_list)
@@ -182,13 +182,16 @@ class GlobalNorm(nn.Cell):
                 self.allreduce_group_size = self.allreduce_group_size + (dense_repeat_num * 1.0,)
             elif "embedding_table" not in x.name:
                 self.allreduce_group_size = self.allreduce_group_size + (layernorm_and_bias_repeat_num * 1.0,)
+            elif (
+                config.parallel_config.vocab_emb_dp
+                or "position_embedding.embedding_table" in x.name
+                or "top_query_embedding_table" in x.name
+            ):
+                self.allreduce_group_size = self.allreduce_group_size + (position_embedding_repeat_num * 1.0,)
+
             else:
-                if not config.parallel_config.vocab_emb_dp and "position_embedding.embedding_table" not in x.name \
-                        and "top_query_embedding_table" not in x.name:
-                    self.allreduce_group_size = self.allreduce_group_size + \
+                self.allreduce_group_size = self.allreduce_group_size + \
                                                 (word_embbedding_repeat_num * 1.0,)
-                else:
-                    self.allreduce_group_size = self.allreduce_group_size + (position_embedding_repeat_num * 1.0,)
 
     def construct(self, grads):
         """Calculate global norm construct"""
@@ -215,10 +218,9 @@ class ClipByGlobalNorm(nn.Cell):
         self.global_norm = GlobalNorm(params, config)
         self.clip_norm = Tensor([clip_norm], mstype.float32)
         self.hyper_map = C.HyperMap()
-        if config.param_init_type == mstype.float16 and config.enable_offload:
-            self.enable_grad_fp16 = True
-        else:
-            self.enable_grad_fp16 = False
+        self.enable_grad_fp16 = bool(
+            config.param_init_type == mstype.float16 and config.enable_offload
+        )
 
     def construct(self, grads):
         """Clip grads by global norm construct"""
@@ -260,19 +262,19 @@ class LearningRate(LearningRateSchedule):
 
     def construct(self, global_step):
         """dynamic learning rate"""
-        if not self.use_cosine:
-            decay_lr = self.decay_lr(global_step)
-        else:
-            decay_lr = self.cosine_decay_lr(global_step)
+        decay_lr = (
+            self.cosine_decay_lr(global_step)
+            if self.use_cosine
+            else self.decay_lr(global_step)
+        )
+
         if self.warmup_flag:
             is_warmup = self.cast(self.greater(self.warmup_steps, global_step),
                                   mstype.float32)
             warmup_lr = self.warmup_lr(global_step)
-            lr = (self.one - is_warmup) * decay_lr + is_warmup * warmup_lr
+            return (self.one - is_warmup) * decay_lr + is_warmup * warmup_lr
         else:
-            lr = decay_lr
-        # self.print(f"Learning rate: {lr.asnumpy().tolist()}")
-        return lr
+            return decay_lr
 
 
 def add_inference_params(opt):
@@ -579,9 +581,7 @@ def get_args(inference=False):
     add_retrain_params(parser)
     if inference:
         add_inference_params(parser)
-    args_opt = parser.parse_args()
-
-    return args_opt
+    return parser.parse_args()
 
 
 def download_data(src_data_url, tgt_data_path, rank):
@@ -604,10 +604,10 @@ def download_data(src_data_url, tgt_data_path, rank):
         mox.file.copy_parallel(src_url=src_data_url, dst_url=cache_url)
         print("Dataset download succeed!", flush=True)
 
-        f = open("%s/install.txt" % (EXEC_PATH), "w")
+        f = open(f"{EXEC_PATH}/install.txt", "w")
         f.close()
     # stop
-    while not os.path.exists("%s/install.txt" % (EXEC_PATH)):
+    while not os.path.exists(f"{EXEC_PATH}/install.txt"):
         time.sleep(1)
 
 # class LossSummaryCallback(Callback):

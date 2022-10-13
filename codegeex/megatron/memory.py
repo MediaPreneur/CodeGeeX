@@ -18,12 +18,12 @@ import torch
 
 
 # A dictionary of all the memory buffers allocated.
-_MEM_BUFFS = dict()
+_MEM_BUFFS = {}
 
 
 def allocate_mem_buff(name, numel, dtype, track_usage):
     """Allocate a memory buffer."""
-    assert name not in _MEM_BUFFS, "memory buffer {} already allocated.".format(name)
+    assert name not in _MEM_BUFFS, f"memory buffer {name} already allocated."
     _MEM_BUFFS[name] = MemoryBuffer(name, numel, dtype, track_usage)
     return _MEM_BUFFS[name]
 
@@ -92,17 +92,15 @@ class MemoryBuffer:
         the values."""
         assert (
             tensor.dtype == self.dtype
-        ), "Input tensor type {} different from buffer type {}".format(
-            tensor.dtype, self.dtype
-        )
+        ), f"Input tensor type {tensor.dtype} different from buffer type {self.dtype}"
+
         # Number of elements of the input tensor.
         tensor_numel = torch.numel(tensor)
         new_start = self._start + tensor_numel
         assert (
             new_start <= self.numel
-        ), "Not enough memory left in the buffer ({} > {})".format(
-            tensor_numel, self.numel - self._start
-        )
+        ), f"Not enough memory left in the buffer ({tensor_numel} > {self.numel - self._start})"
+
         # New tensor is a view into the memory.
         new_tensor = self.data[self._start : new_start]
         self._start = new_start
@@ -137,14 +135,15 @@ class RingMemBuffer:
     def __init__(self, name, num_buffers, numel, dtype, track_usage):
         self.num_buffers = num_buffers
         self.buffers = [
-            allocate_mem_buff(name + " {}".format(i), numel, dtype, track_usage)
+            allocate_mem_buff(f"{name} {i}", numel, dtype, track_usage)
             for i in range(num_buffers)
         ]
+
         self._index = -1
 
     def get_next_buffer(self):
         self._index += 1
-        self._index = self._index % self.num_buffers
+        self._index %= self.num_buffers
         buff = self.buffers[self._index]
         assert not buff.is_in_use(), "buffer is already in use."
         return buff

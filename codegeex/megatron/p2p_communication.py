@@ -56,9 +56,7 @@ def _communicate(
         )
     else:
         tensor_chunk_shape = tensor_shape
-    dtype = args.params_dtype
-    if args.fp32_residual_connection:
-        dtype = torch.float
+    dtype = torch.float if args.fp32_residual_connection else args.params_dtype
     if recv_prev:
         tensor_recv_prev = torch.empty(
             tensor_chunk_shape,
@@ -121,7 +119,7 @@ def _communicate(
                 mpu.get_pipeline_model_parallel_next_rank(),
             )
             ops.append(recv_next_op)
-        if len(ops) > 0:
+        if ops:
             reqs = torch.distributed.batch_isend_irecv(ops)
             for req in reqs:
                 req.wait()

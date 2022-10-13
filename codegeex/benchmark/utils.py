@@ -4,33 +4,34 @@ import os
 from typing import *
 
 LANGUAGE_TAG = {
-    "c++"          : "// language: C++",
-    "cpp"          : "// language: C++",
-    "c"            : "// language: C",
-    "c#"           : "// language: C#",
-    "cuda"         : "// language: Cuda",
-    "objective-c"  : "// language: Objective-C",
+    "c++": "// language: C++",
+    "cpp": "// language: C++",
+    "c": "// language: C",
+    "c#": "// language: C#",
+    "cuda": "// language: Cuda",
+    "objective-c": "// language: Objective-C",
     "objective-c++": "// language: Objective-C++",
-    "python"       : "# language: Python",
-    "java"         : "// language: Java",
-    "scala"        : "// language: Scala",
-    "tex"          : f"% language: TeX",
-    "html"         : "<!--language: HTML-->",
-    "php"          : "// language: PHP",
-    "js"           : "// language: JavaScript",
-    "javascript"   : "// language: JavaScript",
-    "typescript"   : "// language: TypeScript",
-    "go"           : "// language: Go",
-    "shell"        : "# language: Shell",
-    "rust"         : "// language: Rust",
-    "css"          : "/* language: CSS */",
-    "sql"          : "-- language: SQL",
-    "kotlin"       : "// language: Kotlin",
-    "pascal"       : "// language: Pascal",
-    "r"            : "# language: R",
-    "fortran"      : "!language: Fortran",
-    "lean"         : "-- language: Lean",
+    "python": "# language: Python",
+    "java": "// language: Java",
+    "scala": "// language: Scala",
+    "tex": "% language: TeX",
+    "html": "<!--language: HTML-->",
+    "php": "// language: PHP",
+    "js": "// language: JavaScript",
+    "javascript": "// language: JavaScript",
+    "typescript": "// language: TypeScript",
+    "go": "// language: Go",
+    "shell": "# language: Shell",
+    "rust": "// language: Rust",
+    "css": "/* language: CSS */",
+    "sql": "-- language: SQL",
+    "kotlin": "// language: Kotlin",
+    "pascal": "// language: Pascal",
+    "r": "# language: R",
+    "fortran": "!language: Fortran",
+    "lean": "-- language: Lean",
 }
+
 
 IMPORT_HELPER = {
     "python": [
@@ -86,15 +87,13 @@ def read_dataset(
 ) -> Dict:
     if num_shot is not None:
         print(f"{num_shot}-shot setting...")
-    if "humaneval" in dataset_type.lower():
-        if data_file is None:
-            current_path = os.path.dirname(os.path.abspath(__file__))
-            data_file = os.path.join(current_path, "..", "humaneval-x", "python", "data", "humaneval_python.jsonl.gz")
-        dataset = {task["task_id"]: task for task in stream_jsonl(data_file)}
-    else:
+    if "humaneval" not in dataset_type.lower():
         raise f"Dataset: {dataset_type} not supported."
 
-    return dataset
+    if data_file is None:
+        current_path = os.path.dirname(os.path.abspath(__file__))
+        data_file = os.path.join(current_path, "..", "humaneval-x", "python", "data", "humaneval_python.jsonl.gz")
+    return {task["task_id"]: task for task in stream_jsonl(data_file)}
 
 
 def read_translation_dataset(
@@ -104,29 +103,28 @@ def read_translation_dataset(
         lang_tgt: str = None,
         dataset_type: str = "humaneval",
 ) -> Dict:
-    if "humaneval" in dataset_type.lower():
-        dataset_src = {task["task_id"]: task for task in stream_jsonl(data_file_src)}
-        dataset_tgt = {task["task_id"].split("/")[-1]: task for task in stream_jsonl(data_file_tgt)}
-        for k, sample in dataset_src.items():
-            prompt = "code translation\n"
-            if lang_src == "cpp":
-                prompt += "C++:\n"
-            elif lang_src == "js":
-                prompt += "JavaScript:\n"
-            else:
-                prompt += f"{lang_src}:\n".capitalize()
-            prompt += dataset_src[k]["declaration"] + "\n" + dataset_src[k]["canonical_solution"].rstrip() + "\n"
-            if lang_tgt == "cpp":
-                prompt += "C++:\n"
-            elif lang_tgt == "js":
-                prompt += "JavaScript:\n"
-            else:
-                prompt += f"{lang_tgt}:\n".capitalize()
-            prompt += dataset_tgt[k.split("/")[-1]]["declaration"]
-            dataset_src[k]["prompt"] = prompt
-    else:
+    if "humaneval" not in dataset_type.lower():
         raise f"Dataset: {dataset_type} not supported."
 
+    dataset_src = {task["task_id"]: task for task in stream_jsonl(data_file_src)}
+    dataset_tgt = {task["task_id"].split("/")[-1]: task for task in stream_jsonl(data_file_tgt)}
+    for k, sample in dataset_src.items():
+        prompt = "code translation\n"
+        if lang_src == "cpp":
+            prompt += "C++:\n"
+        elif lang_src == "js":
+            prompt += "JavaScript:\n"
+        else:
+            prompt += f"{lang_src}:\n".capitalize()
+        prompt += dataset_src[k]["declaration"] + "\n" + dataset_src[k]["canonical_solution"].rstrip() + "\n"
+        if lang_tgt == "cpp":
+            prompt += "C++:\n"
+        elif lang_tgt == "js":
+            prompt += "JavaScript:\n"
+        else:
+            prompt += f"{lang_tgt}:\n".capitalize()
+        prompt += dataset_tgt[k.split("/")[-1]]["declaration"]
+        dataset_src[k]["prompt"] = prompt
     return dataset_src
 
 
@@ -151,10 +149,7 @@ def write_jsonl(filename: str, data: Iterable[Dict], append: bool = False):
     """
     Writes an iterable of dictionaries to jsonl
     """
-    if append:
-        mode = "ab"
-    else:
-        mode = "wb"
+    mode = "ab" if append else "wb"
     filename = os.path.expanduser(filename)
     if filename.endswith(".gz"):
         with open(filename, mode) as fp:

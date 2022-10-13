@@ -168,12 +168,12 @@ def _set_timers():
 
 def _ensure_var_is_initialized(var, name):
     """Make sure the input variable is not None."""
-    assert var is not None, "{} is not initialized.".format(name)
+    assert var is not None, f"{name} is not initialized."
 
 
 def _ensure_var_is_not_initialized(var, name):
     """Make sure the input variable is not None."""
-    assert var is None, "{} is already initialized.".format(name)
+    assert var is None, f"{name} is already initialized."
 
 
 class _Timer:
@@ -240,7 +240,7 @@ class Timers:
         assert normalizer > 0.0
         for name in names:
             value = self.timers[name].elapsed(reset=reset) / normalizer
-            writer.add_scalar(name + "-time", value, iteration)
+            writer.add_scalar(f"{name}-time", value, iteration)
 
     def log(self, names, normalizer=1.0, reset=True):
         """Log a group of timers."""

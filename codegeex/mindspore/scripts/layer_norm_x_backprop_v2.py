@@ -48,38 +48,40 @@ def get_op_support_info(input_dy,
     shape_mean = input_mean.get("shape")
     shape_gamma = input_gamma.get("shape")
     format_dy = input_dy.get("format").upper()
-    if format_dy in ("ND", "NCHW", "NHWC", "NC1HWC0"):
-        if len(shape_x) == len(shape_gamma):
-            axis_split_matrix = []
-            flag = -1
-            for i, (xtem, mean) in enumerate(zip(shape_x, shape_mean)):
-                if xtem != mean:
-                    flag = i
-                    break
-            if flag == -1:
-                for i in range(len(shape_x) - 1):
-                    split_0 = [
-                        SplitInput([0, [i], [-1], [-1]], [1, [i], [-1], [-1]], [2, [i], [-1], [-1]],
-                                   [3, [i], [-1], [-1]], [4, [i], [-1], [-1]]),
-                        SplitOutput([0, [i]])
-                    ]
-                    axis_split_matrix.append(split_0)
-            else:
-                for i in range(flag):
-                    split_0 = [
-                        SplitInput([0, [i], [-1], [-1]], [1, [i], [-1], [-1]], [2, [i], [-1], [-1]],
-                                   [3, [i], [-1], [-1]], [4, [i], [-1], [-1]]),
-                        SplitOutput([0, [i]], [1, [i]])
-                    ]
-                    axis_split_matrix.append(split_0)
-        else:
-            axis_split_matrix = None
+    if format_dy in ("ND", "NCHW", "NHWC", "NC1HWC0") and len(shape_x) == len(
+        shape_gamma
+    ):
+        axis_split_matrix = []
+        flag = next(
+            (
+                i
+                for i, (xtem, mean) in enumerate(zip(shape_x, shape_mean))
+                if xtem != mean
+            ),
+            -1,
+        )
 
+        if flag == -1:
+            for i in range(len(shape_x) - 1):
+                split_0 = [
+                    SplitInput([0, [i], [-1], [-1]], [1, [i], [-1], [-1]], [2, [i], [-1], [-1]],
+                               [3, [i], [-1], [-1]], [4, [i], [-1], [-1]]),
+                    SplitOutput([0, [i]])
+                ]
+                axis_split_matrix.append(split_0)
+        else:
+            for i in range(flag):
+                split_0 = [
+                    SplitInput([0, [i], [-1], [-1]], [1, [i], [-1], [-1]], [2, [i], [-1], [-1]],
+                               [3, [i], [-1], [-1]], [4, [i], [-1], [-1]]),
+                    SplitOutput([0, [i]], [1, [i]])
+                ]
+                axis_split_matrix.append(split_0)
     else:
         axis_split_matrix = None
+
     axis_reduce_list = None
-    op_cal_info_in_json = get_op_cal_info(axis_split_matrix, axis_reduce_list, 0, 0)
-    return op_cal_info_in_json
+    return get_op_cal_info(axis_split_matrix, axis_reduce_list, 0, 0)
 
 
 # 'pylint: disable=invalid-name,too-many-lines,too-many-arguments
@@ -89,11 +91,6 @@ def _check_dynamic_format(shape_dy, shape_gamma, c_0):
     check dynamic format branch
 
     """
-    if len(shape_dy) < 2 or len(shape_gamma) != 1:
-        return True
-    if shape_dy[-1] % c_0 != 0 or shape_dy[-2] % c_0 != 0 \
-            or shape_gamma[-1] % c_0 != 0:
-        return True
     return True
 
 
@@ -216,9 +213,7 @@ def op_select_format(input_dy,
                                                        "ND,NCHW,NHWC,ND")
 
     param_list = [input0, input1, input2, input3, input4, output0, output1]
-    param_dynamic_in_json = util_select_op_base.get_dynamic_param_in_json(param_list)
-
-    return param_dynamic_in_json
+    return util_select_op_base.get_dynamic_param_in_json(param_list)
 
 
 def _check_params(params_map):
@@ -306,11 +301,14 @@ def _check_shape_mean(shape_x, shape_mean):
         error_detail = "value of shape_mean's last dim must be 1"
         error_manager_vector.raise_err_input_shape_invalid("layer_norm_x_backprop_v2", "input_mean", error_detail)
 
-    flag = -1
-    for i, (xtem, mean) in enumerate(zip(shape_x, shape_mean)):
-        if xtem != mean:
-            flag = i
-            break
+    flag = next(
+        (
+            i
+            for i, (xtem, mean) in enumerate(zip(shape_x, shape_mean))
+            if xtem != mean
+        ),
+        -1,
+    )
 
     if flag != -1:
         for i, mean in enumerate(shape_mean):
@@ -349,11 +347,8 @@ def _check_shape_gamma(shape_x, shape_gamma):
 
 
 def _broadcast_nz(tensor, shape):
-    broadcast_axes = []
     src_shape = shape_util.shape_to_list(tensor.shape)
-    for i, _ in enumerate(shape):
-        if shape[i] != src_shape[i]:
-            broadcast_axes.append(i)
+    broadcast_axes = [i for i, _ in enumerate(shape) if shape[i] != src_shape[i]]
     if len(broadcast_axes) == 2 and \
             broadcast_axes[1] - broadcast_axes[0] != 1 and \
             broadcast_axes[1] + 1 == len(shape):
@@ -418,9 +413,7 @@ def _get_data_gm(shapes, dtype):
     data_mean = tvm.placeholder(shapes.get("shape_mean"), name="data_mean", dtype=dtype)
     data_gamma = tvm.placeholder(shapes.get("shape_gamma"), name="data_gamma", dtype=dtype)
 
-    data_gm = (data_dy, data_x, data_variance, data_mean, data_gamma)
-
-    return data_gm
+    return data_dy, data_x, data_variance, data_mean, data_gamma
 
 
 def _get_params(shape_x, shape_mean, shape_gamma):
@@ -445,14 +438,17 @@ def _get_params(shape_x, shape_mean, shape_gamma):
     param_axis = _update_gamma_shape(shape_x, shape_gamma)[1]
 
     reduce_axis_tmp = []
-    flag = -1
-    for i, (xtem, mean) in enumerate(zip(shape_x, shape_mean)):
-        if xtem != mean:
-            flag = i
-            break
+    flag = next(
+        (
+            i
+            for i, (xtem, mean) in enumerate(zip(shape_x, shape_mean))
+            if xtem != mean
+        ),
+        -1,
+    )
+
     if flag != -1:
-        for i in range(flag, len(shape_x)):
-            reduce_axis_tmp.append(i)
+        reduce_axis_tmp.extend(iter(range(flag, len(shape_x))))
     else:
         reduce_axis_tmp.append(len(shape_x) - 1)
     reduce_axis = tuple(reduce_axis_tmp)
@@ -461,9 +457,11 @@ def _get_params(shape_x, shape_mean, shape_gamma):
     for i in reduce_axis:
         mean_num *= shape_x[i]
 
-    params = {"param_axis": param_axis, "reduce_axis": reduce_axis, "mean_num": mean_num}
-
-    return params
+    return {
+        "param_axis": param_axis,
+        "reduce_axis": reduce_axis,
+        "mean_num": mean_num,
+    }
 
 
 def _get_pd_xl(data, shape_x):
@@ -483,9 +481,7 @@ def _get_pd_xl(data, shape_x):
         data_dy*data_gamma
     """
     data_gamma_cast = tbe.broadcast(data.get("data_gamma"), shape_x)
-    pd_xl = tbe.vmul(data_gamma_cast, data.get("data_dy"))
-
-    return pd_xl
+    return tbe.vmul(data_gamma_cast, data.get("data_dy"))
 
 
 def _get_pd_var_front(data, cast_dtype):
@@ -592,9 +588,7 @@ def _get_pd_mean(params, pd_xl, pd_var, var_elta_2, sub_x_mean, cast_dtype):
     """
     pdmean1_sum = tbe.sum(pd_xl, params.get("reduce_axis"), keepdims=True)
     pdmean1_mul = tbe.vmul(pdmean1_sum, var_elta_2)
-    pd_mean_1 = tbe.vmuls(pdmean1_mul, tvm.const(-1.0, dtype=cast_dtype))
-
-    return pd_mean_1
+    return tbe.vmuls(pdmean1_mul, tvm.const(-1.0, dtype=cast_dtype))
 
 
 def _get_pd_x(data, params, shape_x, dtype, cast_dtype):
@@ -779,9 +773,7 @@ def layer_norm_x_backprop_v2_compute(input_dy,
         (pd_x, pd_gamma, pd_beta)
     """
     pd_x, res_for_gamma = _get_pds(input_dy, input_x, input_variance, input_mean, input_gamma, input_gamma.shape)
-    res_list = [pd_x, res_for_gamma]
-
-    return res_list
+    return [pd_x, res_for_gamma]
 
 
 def update_shape_nz(shape_x, shape_var, shape_gamma):
@@ -793,55 +785,46 @@ def update_shape_nz(shape_x, shape_var, shape_gamma):
     # Nz shape of x >= four dim
     len_x = len(shape_x)
     nz_begin = len_x - 4
-    shape_x_nz = []
-    for i in range(0, nz_begin):
-        shape_x_nz.append(shape_x[i])
-    shape_x_nz.append(shape_x[nz_begin])
-    shape_x_nz.append(shape_x[nz_begin + 1] * shape_x[nz_begin + 2])
-    shape_x_nz.append(shape_x[nz_begin + 2])
+    shape_x_nz = [shape_x[i] for i in range(nz_begin)]
+    shape_x_nz.extend(
+        (
+            shape_x[nz_begin],
+            shape_x[nz_begin + 1] * shape_x[nz_begin + 2],
+            shape_x[nz_begin + 2],
+        )
+    )
 
-    # ND shape of var >= two dim
-    shape_var_nz = []
     len_var = len(shape_var)
     var_nz_begin = len_var - 2
-    for i in range(0, var_nz_begin):
-        shape_var_nz.append(shape_var[i])
-    shape_var_nz.append(1)
-    shape_var_nz.append(shape_var[var_nz_begin])
-    shape_var_nz.append(1)
-
+    shape_var_nz = [shape_var[i] for i in range(var_nz_begin)]
+    shape_var_nz.extend((1, shape_var[var_nz_begin], 1))
     # ND shape of gamma is one dim
-    shape_gamma_nz = []
-    for i in range(0, nz_begin):
-        shape_gamma_nz.append(1)
-    shape_gamma_nz.append(shape_x[nz_begin])
-    shape_gamma_nz.append(1)
-    shape_gamma_nz.append(shape_x[nz_begin + 2])
+    shape_gamma_nz = [1 for _ in range(nz_begin)]
+    shape_gamma_nz.extend((shape_x[nz_begin], 1, shape_x[nz_begin + 2]))
+    reduce_nz_axis = [
+        i
+        for i, (xtem, var) in enumerate(zip(shape_x_nz, shape_var_nz))
+        if xtem != var
+    ]
 
-    reduce_nz_axis = []
-    param_nz_axis = []
-    for i, (xtem, var) in enumerate(zip(shape_x_nz, shape_var_nz)):
-        if xtem != var:
-            reduce_nz_axis.append(i)
-
-    for i, (xtem, gamma) in enumerate(zip(shape_x_nz, shape_gamma_nz)):
-        if xtem != gamma or (xtem == 1 and gamma == 1):
-            param_nz_axis.append(i)
+    param_nz_axis = [
+        i
+        for i, (xtem, gamma) in enumerate(zip(shape_x_nz, shape_gamma_nz))
+        if xtem != gamma or (xtem == 1 and gamma == 1)
+    ]
 
     mean_nz_num = 1.0
     for i in reduce_nz_axis:
         mean_nz_num *= shape_x_nz[i]
 
-    param_nz = {
-        "shape_x_nz"    : shape_x_nz,
-        "shape_var_nz"  : shape_var_nz,
+    return {
+        "shape_x_nz": shape_x_nz,
+        "shape_var_nz": shape_var_nz,
         "shape_gamma_nz": shape_gamma_nz,
-        "reduce_axis"   : reduce_nz_axis,
-        "param_axis"    : param_nz_axis,
-        "mean_num"      : mean_nz_num
+        "reduce_axis": reduce_nz_axis,
+        "param_axis": param_nz_axis,
+        "mean_num": mean_nz_num,
     }
-
-    return param_nz
 
 
 def _get_data_nz(param_nz, dtype):
@@ -855,9 +838,7 @@ def _get_data_nz(param_nz, dtype):
     data_mean = tvm.placeholder(param_nz.get("shape_var_nz"), name="data_mean", dtype=dtype)
     data_gamma = tvm.placeholder(param_nz.get("shape_gamma_nz"), name="data_gamma", dtype=dtype)
 
-    data_gm = (data_dy, data_x, data_variance, data_mean, data_gamma)
-
-    return data_gm
+    return data_dy, data_x, data_variance, data_mean, data_gamma
 
 
 def _get_pd_xl_nz(data, param_nz):
@@ -866,9 +847,7 @@ def _get_pd_xl_nz(data, param_nz):
 
     """
     data_gamma_cast = tbe.broadcast(data.get("data_gamma"), param_nz.get("shape_x_nz"))
-    pd_xl = tbe.vmul(data_gamma_cast, data.get("data_dy"))
-
-    return pd_xl
+    return tbe.vmul(data_gamma_cast, data.get("data_dy"))
 
 
 def _get_pd_var_front_nz(data, cast_dtype):
@@ -912,9 +891,7 @@ def _get_pd_mean_nz(param_nz, pd_xl, pd_var, var_elta_2, sub_x_mean, cast_dtype)
     """
     pdmean1_sum = tbe.sum(pd_xl, param_nz.get("reduce_axis"), keepdims=True)
     pdmean1_mul = tbe.vmul(pdmean1_sum, var_elta_2)
-    pd_mean_1 = tbe.vmuls(pdmean1_mul, tvm.const(-1.0, dtype=cast_dtype))
-
-    return pd_mean_1
+    return tbe.vmuls(pdmean1_mul, tvm.const(-1.0, dtype=cast_dtype))
 
 
 def _get_pd_x_nz(data, param_nz, dtype, cast_dtype):
@@ -1116,9 +1093,6 @@ def layer_norm_x_backprop_v2(input_dy,
             with tvm.target.cce():
                 sch = tbe.auto_schedule(res_list)
 
-            config = {"print_ir": False, "name": kernel_name, "tensor_list": tensor_list}
-
-            tbe.cce_build_code(sch, config)
         else:
             _check_params({
                 "shape_dy"   : shape_dy,
@@ -1148,6 +1122,7 @@ def layer_norm_x_backprop_v2(input_dy,
 
             tensor_list = list(data_gm) + list(res_list)
 
-            config = {"print_ir": False, "name": kernel_name, "tensor_list": tensor_list}
 
-            tbe.cce_build_code(sch, config)
+        config = {"print_ir": False, "name": kernel_name, "tensor_list": tensor_list}
+
+        tbe.cce_build_code(sch, config)

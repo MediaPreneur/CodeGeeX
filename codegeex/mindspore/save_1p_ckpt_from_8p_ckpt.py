@@ -70,12 +70,11 @@ def set_weight_decay(params):
     decay_filter = lambda x: 'layernorm' not in x.name.lower() and "bias" not in x.name.lower()
     decay_params = list(filter(decay_filter, params))
     other_params = list(filter(lambda x: not decay_filter(x), params))
-    group_params = [
+    return [
         {"params": decay_params, "weight_decay": 1e-1},
         {"params": other_params, "weight_decay": 0.0},
         {"order_params": params},
     ]
-    return group_params
 
 
 def add_checkpoint_callback_policy(args_param, callback, rank_id):
@@ -113,7 +112,7 @@ def set_parallel_context(args_opt):
     D.init()
     device_num = D.get_group_size()
     rank = D.get_rank()
-    print("rank_id is {}, device_num is {}".format(rank, device_num))
+    print(f"rank_id is {rank}, device_num is {device_num}")
     context.reset_auto_parallel_context()
     context.set_auto_parallel_context(
         parallel_mode=ParallelMode.SEMI_AUTO_PARALLEL, gradients_mean=False,
@@ -127,7 +126,7 @@ def set_parallel_context(args_opt):
 
 def download_ckpt(args_opt, file_num, rank_num, rank_id):
     ckpt_list = []
-    for rank in range(0, file_num):
+    for rank in range(file_num):
         ckpt_name = f"code-13B{rank}-{args_opt.load_ckpt_epoch}.ckpt"
         local_file = os.path.join(args_opt.save_checkpoint_path, f"origin_rank_{rank}", ckpt_name)
         ckpt_list.append(local_file)
@@ -177,12 +176,11 @@ def transform_model_parallel(restore_local_ckpt_file_list, train_strategy_file, 
     rank_list = _infer_rank_list(train_strategy, None)
     strategy_keys = list(train_strategy_origin.keys())
     merged_param_list = []
-    for param_name in param_total_dict.keys():
+    for param_name in param_total_dict:
         if "adam" in param_name:
             continue
         if param_name not in strategy_keys:
-            each_param = {"name": param_name}
-            each_param["data"] = param_total_dict[param_name][0]
+            each_param = {"name": param_name, "data": param_total_dict[param_name][0]}
             print("====", param_name, param_total_dict[param_name][0].data.asnumpy().shape, flush=True)
             merged_param_list.append(each_param)
             continue
@@ -240,7 +238,7 @@ def run_transform_model_parallel_ckpt(args_opt):
         mox.file.make_dirs(rank_obs_save_path)
     rank_obs_save_file = os.path.join(rank_obs_save_path, f"code-13B{rank}-{args_opt.load_ckpt_epoch}.ckpt")
     if not os.path.exists(save_file):
-        raise ValueError(save_file + " not exists")
+        raise ValueError(f"{save_file} not exists")
     mox.file.copy(save_file, rank_obs_save_file)
     print("=====save ok, save_path", save_path)
 

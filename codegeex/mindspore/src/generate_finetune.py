@@ -61,17 +61,14 @@ def sampler(log_probs_revised, top_p, top_k_num, use_pynative=False, bad_words_i
         for i, top_p in enumerate(top_p_num):
             probs[i][top_p:] = 0
         p_args = index
-        p = probs / probs.sum(axis=1).reshape(-1, 1)
-        # if top_p is set to 1.0, use top_k sampling
+            # if top_p is set to 1.0, use top_k sampling
+    elif use_pynative:
+        probs, p_args = P.TopK(sorted=True)(logits, top_k_num)
+        probs = probs.asnumpy()
+        p_args = p_args.asnumpy()
     else:
-        # Get the corresponding probs and indices
-        if use_pynative:
-            probs, p_args = P.TopK(sorted=True)(logits, top_k_num)
-            probs = probs.asnumpy()
-            p_args = p_args.asnumpy()
-        else:
-            probs, p_args = topk_fun(logits, top_k_num)
-        p = probs / probs.sum(axis=1).reshape(-1, 1)
+        probs, p_args = topk_fun(logits, top_k_num)
+    p = probs / probs.sum(axis=1).reshape(-1, 1)
     return p, p_args
 
 

@@ -60,47 +60,64 @@ def loadModelFromNp(sd, args):
         loadAttentionLayerFromNp(npCkptPath, transformer, layerID)
     loadQueryLayerFromNp(npCkptPath, transformer)
 
-    transformer['final_layernorm.weight'][:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.layernorm.gamma.npy')
-        ).float()
-    transformer['final_layernorm.bias'][:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.layernorm.beta.npy')
-        ).float()
+    transformer['final_layernorm.weight'][:] = torch.tensor(
+        np.load(f'{npCkptPath}backbone.layernorm.gamma.npy')
+    ).float()
+
+    transformer['final_layernorm.bias'][:] = torch.tensor(
+        np.load(f'{npCkptPath}backbone.layernorm.beta.npy')
+    ).float()
 
 
 def loadEmbeddingFromNp(npCkptPath, languageModel, vocabSize=52224):
-    word_embedding_np = \
-        np.load(npCkptPath + 'backbone.embedding.word_embedding.embedding_table.npy')
+    word_embedding_np = np.load(
+        f'{npCkptPath}backbone.embedding.word_embedding.embedding_table.npy'
+    )
+
     languageModel['embedding']['word_embeddings']['weight'][:vocabSize, :] = \
         torch.tensor(word_embedding_np).float()
 
-    position_embeddings_np = \
-        np.load(npCkptPath + 'backbone.embedding.position_embedding.embedding_table.npy')
+    position_embeddings_np = np.load(
+        f'{npCkptPath}backbone.embedding.position_embedding.embedding_table.npy'
+    )
+
     languageModel['embedding']['position_embeddings']['weight'][:, :] = \
         torch.tensor(position_embeddings_np).float()
 
-    topQueryEmbedding_np = \
-        np.load(npCkptPath + 'backbone.top_query_embedding.embedding_table.npy')
+    topQueryEmbedding_np = np.load(
+        f'{npCkptPath}backbone.top_query_embedding.embedding_table.npy'
+    )
+
     languageModel['topQueryEmbedding']['top_query_embeddings']['weight'][:, :] = \
         torch.tensor(topQueryEmbedding_np).float()
 
 
 def loadAttentionLayerFromNp(npCkptPath, transformer, layerID):
-    attention_dense1_weight_np = \
-        np.load(npCkptPath + f'backbone.blocks.{layerID}.attention.dense1.weight.npy')
-    attention_dense2_weight_np = \
-        np.load(npCkptPath + f'backbone.blocks.{layerID}.attention.dense2.weight.npy')
-    attention_dense3_weight_np = \
-        np.load(npCkptPath + f'backbone.blocks.{layerID}.attention.dense3.weight.npy')
+    attention_dense1_weight_np = np.load(
+        f'{npCkptPath}backbone.blocks.{layerID}.attention.dense1.weight.npy'
+    )
 
-    attention_dense1_bias_np = \
-        np.load(npCkptPath + f'backbone.blocks.{layerID}.attention.dense1.bias.npy')
-    attention_dense2_bias_np = \
-        np.load(npCkptPath + f'backbone.blocks.{layerID}.attention.dense2.bias.npy')
-    attention_dense3_bias_np = \
-        np.load(npCkptPath + f'backbone.blocks.{layerID}.attention.dense3.bias.npy')
+    attention_dense2_weight_np = np.load(
+        f'{npCkptPath}backbone.blocks.{layerID}.attention.dense2.weight.npy'
+    )
+
+    attention_dense3_weight_np = np.load(
+        f'{npCkptPath}backbone.blocks.{layerID}.attention.dense3.weight.npy'
+    )
+
+
+    attention_dense1_bias_np = np.load(
+        f'{npCkptPath}backbone.blocks.{layerID}.attention.dense1.bias.npy'
+    )
+
+    attention_dense2_bias_np = np.load(
+        f'{npCkptPath}backbone.blocks.{layerID}.attention.dense2.bias.npy'
+    )
+
+    attention_dense3_bias_np = np.load(
+        f'{npCkptPath}backbone.blocks.{layerID}.attention.dense3.bias.npy'
+    )
+
 
     query_weight = transformer[f'layers.{layerID}.attention.query.weight']
     key_weight = transformer[f'layers.{layerID}.attention.key.weight']
@@ -119,172 +136,215 @@ def loadAttentionLayerFromNp(npCkptPath, transformer, layerID):
     value_bias[:] = torch.tensor(attention_dense3_bias_np).float()
 
     att_dense_weight = transformer[f'layers.{layerID}.attention.dense.weight']
-    att_dense_weight[:, :] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.blocks.{layerID}.attention.projection.weight.npy').transpose()
-        ).float()
+    att_dense_weight[:, :] = torch.tensor(
+        np.load(
+            f'{npCkptPath}backbone.blocks.{layerID}.attention.projection.weight.npy'
+        ).transpose()
+    ).float()
+
     att_dense_bias = transformer[f'layers.{layerID}.attention.dense.bias']
-    att_dense_bias[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.blocks.{layerID}.attention.projection.bias.npy')
-        ).float()
+    att_dense_bias[:] = torch.tensor(
+        np.load(
+            f'{npCkptPath}backbone.blocks.{layerID}.attention.projection.bias.npy'
+        )
+    ).float()
+
 
     mlp_dense_h_to_4h_weight = transformer[f'layers.{layerID}.mlp.dense_h_to_4h.weight']
-    mlp_dense_h_to_4h_weight[:, :] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.blocks.{layerID}.output.mapping.weight.npy').transpose()
-        ).float()
+    mlp_dense_h_to_4h_weight[:, :] = torch.tensor(
+        np.load(
+            f'{npCkptPath}backbone.blocks.{layerID}.output.mapping.weight.npy'
+        ).transpose()
+    ).float()
+
     mlp_dense_h_to_4h_bias = transformer[f'layers.{layerID}.mlp.dense_h_to_4h.bias']
-    mlp_dense_h_to_4h_bias[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.blocks.{layerID}.output.mapping.bias.npy')
-        ).float()
+    mlp_dense_h_to_4h_bias[:] = torch.tensor(
+        np.load(
+            f'{npCkptPath}backbone.blocks.{layerID}.output.mapping.bias.npy'
+        )
+    ).float()
+
 
     mlp_dense_4h_to_h_weight = transformer[f'layers.{layerID}.mlp.dense_4h_to_h.weight']
-    mlp_dense_4h_to_h_weight[:, :] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.blocks.{layerID}.output.projection.weight.npy').transpose()
-        ).float()
+    mlp_dense_4h_to_h_weight[:, :] = torch.tensor(
+        np.load(
+            f'{npCkptPath}backbone.blocks.{layerID}.output.projection.weight.npy'
+        ).transpose()
+    ).float()
+
     mlp_dense_4h_to_h_bias = transformer[f'layers.{layerID}.mlp.dense_4h_to_h.bias']
-    mlp_dense_4h_to_h_bias[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.blocks.{layerID}.output.projection.bias.npy')
-        ).float()
+    mlp_dense_4h_to_h_bias[:] = torch.tensor(
+        np.load(
+            f'{npCkptPath}backbone.blocks.{layerID}.output.projection.bias.npy'
+        )
+    ).float()
+
 
     input_layernorm_weight = transformer[f'layers.{layerID}.input_layernorm.weight']
-    input_layernorm_weight[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.blocks.{layerID}.layernorm1.gamma.npy')
-        ).float()
+    input_layernorm_weight[:] = torch.tensor(
+        np.load(f'{npCkptPath}backbone.blocks.{layerID}.layernorm1.gamma.npy')
+    ).float()
+
     input_layernorm_bias = transformer[f'layers.{layerID}.input_layernorm.bias']
-    input_layernorm_bias[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.blocks.{layerID}.layernorm1.beta.npy')
-        ).float()
+    input_layernorm_bias[:] = torch.tensor(
+        np.load(f'{npCkptPath}backbone.blocks.{layerID}.layernorm1.beta.npy')
+    ).float()
+
 
     post_attention_layernorm_weight = transformer[f'layers.{layerID}.post_attention_layernorm.weight']
-    post_attention_layernorm_weight[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.blocks.{layerID}.layernorm2.gamma.npy')
-        ).float()
+    post_attention_layernorm_weight[:] = torch.tensor(
+        np.load(f'{npCkptPath}backbone.blocks.{layerID}.layernorm2.gamma.npy')
+    ).float()
+
     post_attention_layernorm_bias = transformer[f'layers.{layerID}.post_attention_layernorm.bias']
-    post_attention_layernorm_bias[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.blocks.{layerID}.layernorm2.beta.npy')
-        ).float()
+    post_attention_layernorm_bias[:] = torch.tensor(
+        np.load(f'{npCkptPath}backbone.blocks.{layerID}.layernorm2.beta.npy')
+    ).float()
+
 
     input_layernorm_weight = transformer[f'layers.{layerID}.input_layernorm.weight']
-    input_layernorm_weight[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.blocks.{layerID}.layernorm1.gamma.npy')
-        ).float()
+    input_layernorm_weight[:] = torch.tensor(
+        np.load(f'{npCkptPath}backbone.blocks.{layerID}.layernorm1.gamma.npy')
+    ).float()
+
     input_layernorm_bias = transformer[f'layers.{layerID}.input_layernorm.bias']
-    input_layernorm_bias[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.blocks.{layerID}.layernorm1.beta.npy')
-        ).float()
+    input_layernorm_bias[:] = torch.tensor(
+        np.load(f'{npCkptPath}backbone.blocks.{layerID}.layernorm1.beta.npy')
+    ).float()
+
 
     post_attention_layernorm_weight = transformer[f'layers.{layerID}.post_attention_layernorm.weight']
-    post_attention_layernorm_weight[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.blocks.{layerID}.layernorm2.gamma.npy')
-        ).float()
+    post_attention_layernorm_weight[:] = torch.tensor(
+        np.load(f'{npCkptPath}backbone.blocks.{layerID}.layernorm2.gamma.npy')
+    ).float()
+
     post_attention_layernorm_bias = transformer[f'layers.{layerID}.post_attention_layernorm.bias']
-    post_attention_layernorm_bias[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.blocks.{layerID}.layernorm2.beta.npy')
-        ).float()
+    post_attention_layernorm_bias[:] = torch.tensor(
+        np.load(f'{npCkptPath}backbone.blocks.{layerID}.layernorm2.beta.npy')
+    ).float()
 
 
 def loadQueryLayerFromNp(npCkptPath, transformer):
-    attention_dense1_weight_np = \
-        np.load(npCkptPath + f'backbone.top_query_layer.attention.dense1.weight.npy')
-    attention_dense1_bias_np = \
-        np.load(npCkptPath + f'backbone.top_query_layer.attention.dense1.bias.npy')
-    attention_dense2_weight_np = \
-        np.load(npCkptPath + f'backbone.top_query_layer.attention.dense2.weight.npy')
-    attention_dense2_bias_np = \
-        np.load(npCkptPath + f'backbone.top_query_layer.attention.dense2.bias.npy')
-    attention_dense3_weight_np = \
-        np.load(npCkptPath + f'backbone.top_query_layer.attention.dense3.weight.npy')
-    attention_dense3_bias_np = \
-        np.load(npCkptPath + f'backbone.top_query_layer.attention.dense3.bias.npy')
+    attention_dense1_weight_np = np.load(
+        f'{npCkptPath}backbone.top_query_layer.attention.dense1.weight.npy'
+    )
 
-    query_weight = transformer[f'topQueryLayer.attention.query.weight']
+    attention_dense1_bias_np = np.load(
+        f'{npCkptPath}backbone.top_query_layer.attention.dense1.bias.npy'
+    )
+
+    attention_dense2_weight_np = np.load(
+        f'{npCkptPath}backbone.top_query_layer.attention.dense2.weight.npy'
+    )
+
+    attention_dense2_bias_np = np.load(
+        f'{npCkptPath}backbone.top_query_layer.attention.dense2.bias.npy'
+    )
+
+    attention_dense3_weight_np = np.load(
+        f'{npCkptPath}backbone.top_query_layer.attention.dense3.weight.npy'
+    )
+
+    attention_dense3_bias_np = np.load(
+        f'{npCkptPath}backbone.top_query_layer.attention.dense3.bias.npy'
+    )
+
+
+    query_weight = transformer['topQueryLayer.attention.query.weight']
     query_weight[:, :] = \
         torch.tensor(attention_dense1_weight_np).float()
-    query_bias = transformer[f'topQueryLayer.attention.query.bias']
+    query_bias = transformer['topQueryLayer.attention.query.bias']
     query_bias[:] = torch.tensor(attention_dense1_bias_np).float()
 
-    key_weight = transformer[f'topQueryLayer.attention.key.weight']
+    key_weight = transformer['topQueryLayer.attention.key.weight']
     key_weight[:, :] = \
         torch.tensor(attention_dense2_weight_np).float()
-    key_bias = transformer[f'topQueryLayer.attention.key.bias']
+    key_bias = transformer['topQueryLayer.attention.key.bias']
     key_bias[:] = torch.tensor(attention_dense2_bias_np).float()
 
-    value_weight = transformer[f'topQueryLayer.attention.value.weight']
+    value_weight = transformer['topQueryLayer.attention.value.weight']
     value_weight[:, :] = \
         torch.tensor(attention_dense3_weight_np).float()
-    value_bias = transformer[f'topQueryLayer.attention.value.bias']
+    value_bias = transformer['topQueryLayer.attention.value.bias']
     value_bias[:] = torch.tensor(attention_dense3_bias_np).float()
 
-    att_dense_weight = transformer[f'topQueryLayer.attention.dense.weight']
-    att_dense_weight[:, :] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.top_query_layer.attention.projection.weight.npy')
-            .transpose()
-        ).float()
-    att_dense_bias = transformer[f'topQueryLayer.attention.dense.bias']
-    att_dense_bias[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.top_query_layer.attention.projection.bias.npy')
-        ).float()
+    att_dense_weight = transformer['topQueryLayer.attention.dense.weight']
+    att_dense_weight[:, :] = torch.tensor(
+        np.load(
+            f'{npCkptPath}backbone.top_query_layer.attention.projection.weight.npy'
+        ).transpose()
+    ).float()
 
-    mlp_dense_h_to_4h_weight = transformer[f'topQueryLayer.mlp.dense_h_to_4h.weight']
-    mlp_dense_h_to_4h_weight[:, :] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.top_query_layer.output.mapping.weight.npy')
-            .transpose()
-        ).float()
-    mlp_dense_h_to_4h_bias = transformer[f'topQueryLayer.mlp.dense_h_to_4h.bias']
-    mlp_dense_h_to_4h_bias[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.top_query_layer.output.mapping.bias.npy')
-        ).float()
+    att_dense_bias = transformer['topQueryLayer.attention.dense.bias']
+    att_dense_bias[:] = torch.tensor(
+        np.load(
+            f'{npCkptPath}backbone.top_query_layer.attention.projection.bias.npy'
+        )
+    ).float()
 
-    mlp_dense_4h_to_h_weight = transformer[f'topQueryLayer.mlp.dense_4h_to_h.weight']
-    mlp_dense_4h_to_h_weight[:, :] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.top_query_layer.output.projection.weight.npy')
-            .transpose()
-        ).float()
-    mlp_dense_4h_to_h_bias = transformer[f'topQueryLayer.mlp.dense_4h_to_h.bias']
-    mlp_dense_4h_to_h_bias[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.top_query_layer.output.projection.bias.npy')
-        ).float()
 
-    input_layernorm_weight = transformer[f'topQueryLayer.input_layernorm.weight']
-    input_layernorm_weight[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.top_query_layer.layernorm1.gamma.npy')
-        ).float()
-    input_layernorm_bias = transformer[f'topQueryLayer.input_layernorm.bias']
-    input_layernorm_bias[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.top_query_layer.layernorm1.beta.npy')
-        ).float()
+    mlp_dense_h_to_4h_weight = transformer[
+        'topQueryLayer.mlp.dense_h_to_4h.weight'
+    ]
 
-    post_attention_layernorm_weight = transformer[f'topQueryLayer.post_attention_layernorm.weight']
-    post_attention_layernorm_weight[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.top_query_layer.layernorm2.gamma.npy')
-        ).float()
-    post_attention_layernorm_bias = transformer[f'topQueryLayer.post_attention_layernorm.bias']
-    post_attention_layernorm_bias[:] = \
-        torch.tensor(
-            np.load(npCkptPath + f'backbone.top_query_layer.layernorm2.beta.npy')
-        ).float()
+    mlp_dense_h_to_4h_weight[:, :] = torch.tensor(
+        np.load(
+            f'{npCkptPath}backbone.top_query_layer.output.mapping.weight.npy'
+        ).transpose()
+    ).float()
+
+    mlp_dense_h_to_4h_bias = transformer['topQueryLayer.mlp.dense_h_to_4h.bias']
+    mlp_dense_h_to_4h_bias[:] = torch.tensor(
+        np.load(
+            f'{npCkptPath}backbone.top_query_layer.output.mapping.bias.npy'
+        )
+    ).float()
+
+
+    mlp_dense_4h_to_h_weight = transformer[
+        'topQueryLayer.mlp.dense_4h_to_h.weight'
+    ]
+
+    mlp_dense_4h_to_h_weight[:, :] = torch.tensor(
+        np.load(
+            f'{npCkptPath}backbone.top_query_layer.output.projection.weight.npy'
+        ).transpose()
+    ).float()
+
+    mlp_dense_4h_to_h_bias = transformer['topQueryLayer.mlp.dense_4h_to_h.bias']
+    mlp_dense_4h_to_h_bias[:] = torch.tensor(
+        np.load(
+            f'{npCkptPath}backbone.top_query_layer.output.projection.bias.npy'
+        )
+    ).float()
+
+
+    input_layernorm_weight = transformer['topQueryLayer.input_layernorm.weight']
+    input_layernorm_weight[:] = torch.tensor(
+        np.load(f'{npCkptPath}backbone.top_query_layer.layernorm1.gamma.npy')
+    ).float()
+
+    input_layernorm_bias = transformer['topQueryLayer.input_layernorm.bias']
+    input_layernorm_bias[:] = torch.tensor(
+        np.load(f'{npCkptPath}backbone.top_query_layer.layernorm1.beta.npy')
+    ).float()
+
+
+    post_attention_layernorm_weight = transformer[
+        'topQueryLayer.post_attention_layernorm.weight'
+    ]
+
+    post_attention_layernorm_weight[:] = torch.tensor(
+        np.load(f'{npCkptPath}backbone.top_query_layer.layernorm2.gamma.npy')
+    ).float()
+
+    post_attention_layernorm_bias = transformer[
+        'topQueryLayer.post_attention_layernorm.bias'
+    ]
+
+    post_attention_layernorm_bias[:] = torch.tensor(
+        np.load(f'{npCkptPath}backbone.top_query_layer.layernorm2.beta.npy')
+    ).float()
 
 
 def main():
@@ -306,11 +366,10 @@ def main():
     print(model.state_dict)
 
     # Save the model.
-    sd = {}
-    sd['module'] = model.state_dict_for_save_checkpoint()
+    sd = {'module': model.state_dict_for_save_checkpoint()}
     ensure_directory_exists(args.save_ckpt_path)
     loadModelFromNp(sd, args)
-    print('> saving merged model to {}'.format(args.save_ckpt_path))
+    print(f'> saving merged model to {args.save_ckpt_path}')
     torch.save(sd, args.save_ckpt_path)
     print(f"Converted checkpoint saved in {args.save_ckpt_path}.")
 

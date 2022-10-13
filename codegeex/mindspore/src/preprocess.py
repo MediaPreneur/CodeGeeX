@@ -76,7 +76,7 @@ def clean_wikitext(string):
     string = string.replace("= = = =", "====")
     string = string.replace("= = =", "===")
     string = string.replace("= =", "==")
-    string = string.replace(" " + chr(176) + " ", chr(176))
+    string = string.replace(f" {chr(176)} ", chr(176))
     string = string.replace(" \n", "\n")
     string = string.replace("\n ", "\n")
     string = string.replace(" N ", " 1 ")
@@ -98,10 +98,8 @@ def tokenize_openwebtext(tokenizer, iterator, seq_length, eot):
                         tokenized_text
                     ) + [eot]
         for chunk in chunks(content, seq_length):
-            sample = {}
             if len(chunk) == seq_length:
-                sample["input_ids"] = np.array(chunk, dtype=np.int32)
-                yield sample
+                yield {"input_ids": np.array(chunk, dtype=np.int32)}
 
 
 def tokenize_wiki(tokenizer, file_path, seq_length, eot):
@@ -115,17 +113,15 @@ def tokenize_wiki(tokenizer, file_path, seq_length, eot):
                     eot
                 ]
     for chunk in chunks(content, seq_length):
-        sample = {}
         if len(chunk) == seq_length:
-            sample["input_ids"] = np.array(chunk, dtype=np.int32)
-            yield sample
+            yield {"input_ids": np.array(chunk, dtype=np.int32)}
 
 
 def tokenize_lambada(tokenizer, file_path, seq_length, eot):
     """tokenize lambada dataset"""
     content = []
     with open(file_path, "r", encoding="utf-8") as f:
-        for line in f.readlines():
+        for line in f:
             para = (
                 json.loads(line)["text"]
                 .replace("“", '"')
@@ -136,16 +132,14 @@ def tokenize_lambada(tokenizer, file_path, seq_length, eot):
             tokenized_text = tokenizer.tokenize(para)
             content += tokenizer.convert_tokens_to_ids(tokenized_text) + [eot]
     for chunk in chunks(content, seq_length):
-        sample = {}
         if len(chunk) == seq_length:
-            sample["input_ids"] = np.array(chunk, dtype=np.int32)
-            yield sample
+            yield {"input_ids": np.array(chunk, dtype=np.int32)}
 
 
 def task_unit(iterator, tokenizer, seq_length, eot, parallel_writer=True):
     """task for each process"""
     p = current_process()
-    index = p.pid if p.pid else 0
+    index = p.pid or 0
 
     item_iter = tokenize_openwebtext(tokenizer, iterator, seq_length, eot)
     batch_size = 1024  # size of write batch
@@ -157,13 +151,13 @@ def task_unit(iterator, tokenizer, seq_length, eot, parallel_writer=True):
                 data_batch.append(next(item_iter))
                 count += 1
             writer.write_raw_data(data_batch, parallel_writer=parallel_writer)
-            print("Process {} transformed {} records.".format(index, count))
+            print(f"Process {index} transformed {count} records.")
         except StopIteration:
             if data_batch:
                 writer.write_raw_data(
                     data_batch, parallel_writer=parallel_writer
                 )
-                print("Process {} transformed {} records.".format(index, count))
+                print(f"Process {index} transformed {count} records.")
             break
 
 
@@ -223,14 +217,14 @@ if __name__ == "__main__":
         ):
             transforms_count += 1
             writer.write_raw_data([x])
-        print("Transformed {} records.".format(transforms_count))
+        print(f"Transformed {transforms_count} records.")
     elif args.dataset_type == "lambada":
         for x in tokenize_lambada(
                 word_tokenizer, args.input_glob, args.seq_length, args.eot
         ):
             transforms_count += 1
             writer.write_raw_data([x])
-        print("Transformed {} records.".format(transforms_count))
+        print(f"Transformed {transforms_count} records.")
     elif args.dataset_type == "openwebtext":
         file_iter = glob.iglob(args.input_glob)
         with Pool(processes=args.num_process) as pool:
@@ -242,12 +236,10 @@ if __name__ == "__main__":
             )
             pool.map(map_func, package_file(file_iter, args.file_batch_size))
     else:
-        raise ValueError(
-            "Not support dataset type: {}".format(args.dataset_type)
-        )
+        raise ValueError(f"Not support dataset type: {args.dataset_type}")
 
     writer.commit()
     out_file = args.output_file
     if args.file_partition > 1:
         out_file += "0"
-    print("Transform finished, output files refer: {}".format(out_file))
+    print(f"Transform finished, output files refer: {out_file}")

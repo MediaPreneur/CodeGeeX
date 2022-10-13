@@ -56,10 +56,7 @@ def init_checkpointed_activations_memory_buffer():
     ), "number of layers is not divisible by checkpoint-num-layers"
     num_checkpointer_layers = args.num_layers // args.checkpoint_num_layers
     numel = per_layer * num_checkpointer_layers
-    dtype = torch.half
-    if not args.fp16:
-        dtype = torch.float
-
+    dtype = torch.half if args.fp16 else torch.float
     global _CHECKPOINTED_ACTIVATIONS_MEMORY_BUFFER
     assert (
         _CHECKPOINTED_ACTIVATIONS_MEMORY_BUFFER is None
@@ -159,10 +156,7 @@ class CudaRNGStatesTracker:
     def get_states(self):
         """Get rng states. Copy the dictionary so we have direct
         pointers to the states, not just a pointer to the dictionary."""
-        states = {}
-        for name in self.states_:
-            states[name] = self.states_[name]
-        return states
+        return {name: self.states_[name] for name in self.states_}
 
     def set_states(self, states):
         """Set the rng states. For efficiency purposes, we do not check
@@ -173,11 +167,11 @@ class CudaRNGStatesTracker:
         """Track the rng state."""
         # Check seed is not already used.
         if seed in self.seeds_:
-            raise Exception("seed {} already exists".format(seed))
+            raise Exception(f"seed {seed} already exists")
         self.seeds_.add(seed)
         # Check that state is not already defined.
         if name in self.states_:
-            raise Exception("cuda rng state {} already exists".format(name))
+            raise Exception(f"cuda rng state {name} already exists")
         # Get the current rng state.
         orig_rng_state = torch.cuda.get_rng_state()
         # Set the new state and store it.
@@ -193,7 +187,7 @@ class CudaRNGStatesTracker:
         # Check if we have added the state
         if name not in self.states_:
             print(name, self.states_)
-            raise Exception("cuda rng state {} is not added".format(name))
+            raise Exception(f"cuda rng state {name} is not added")
         # Store current rng state.
         orig_cuda_rng_state = torch.cuda.get_rng_state()
         # Set rng state to the desired one
@@ -242,17 +236,10 @@ def model_parallel_cuda_manual_seed(seed):
 
     if torch.distributed.get_rank() == 0:
         print(
-            "> initializing model parallel cuda seeds on global rank {}, "
-            "model parallel rank {}, and data parallel rank {} with "
-            "model parallel seed: {} and data parallel seed: {}".format(
-                torch.distributed.get_rank(),
-                get_tensor_model_parallel_rank(),
-                get_data_parallel_rank(),
-                tensor_model_parallel_seed,
-                data_parallel_seed,
-            ),
+            f"> initializing model parallel cuda seeds on global rank {torch.distributed.get_rank()}, model parallel rank {get_tensor_model_parallel_rank()}, and data parallel rank {get_data_parallel_rank()} with model parallel seed: {tensor_model_parallel_seed} and data parallel seed: {data_parallel_seed}",
             flush=True,
         )
+
     _CUDA_RNG_STATE_TRACKER.reset()
     # Set the default state.
     torch.cuda.manual_seed(data_parallel_seed)

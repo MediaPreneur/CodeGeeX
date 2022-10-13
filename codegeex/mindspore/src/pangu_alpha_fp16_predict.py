@@ -247,11 +247,9 @@ class PanGuHead(Cell):
 
     def construct(self, state, embed):
         state = P.Reshape()(state, (-1, self.hidden_size))
-        # output logits over vocabulary [bs*seq_length, vocab_size]
-        logits = self.matmul(
+        return self.matmul(
             self.cast(state, self.dtype), self.cast(embed, self.dtype)
         )
-        return logits
 
 
 def set_parallel_configure_for_layer(
@@ -553,10 +551,8 @@ class PanGUAlphaWithLoss(Cell):
         labels = self.slice(input_ids, (0, 1), (self.batch_size, self.len + 1), (1, 1))
         labels = P.Reshape()(labels, (-1,))
         input_mask = P.Reshape()(input_mask, (-1,))
-        # P.Print()("==input_mask is:", input_mask)
-        output = self.loss(logits, labels, input_mask)
         # P.Print()("==net output is:", output)
-        return output
+        return self.loss(logits, labels, input_mask)
 
 
 class EvalNet(nn.Cell):
@@ -607,5 +603,4 @@ class EvalNet(nn.Cell):
         self.print("EvalNet: index", index)
         logits = self.gather(logits, index, 0)
         logits = logits.view(bs, 1, -1)
-        log_probs = self.log_softmax(logits)
-        return log_probs
+        return self.log_softmax(logits)

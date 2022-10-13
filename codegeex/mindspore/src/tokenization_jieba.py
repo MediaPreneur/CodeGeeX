@@ -69,8 +69,7 @@ class JIEBATokenizer():
         return self.decode(ids)
 
     def encode(self, text):
-        res = self.tokenize(text)
-        return res
+        return self.tokenize(text)
 
     def decode(self, tokens):
         text = self.sp.decode(tokens)

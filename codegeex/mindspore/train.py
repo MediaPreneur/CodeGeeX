@@ -63,12 +63,11 @@ def set_weight_decay(params):
     decay_filter = lambda x: 'layernorm' not in x.name.lower() and "bias" not in x.name.lower()
     decay_params = list(filter(decay_filter, params))
     other_params = list(filter(lambda x: not decay_filter(x), params))
-    group_params = [
+    return [
         {"params": decay_params, "weight_decay": 1e-1},
         {"params": other_params, "weight_decay": 0.0},
         {"order_params": params},
     ]
-    return group_params
 
 
 def add_checkpoint_callback_policy(args_param, callback, rank_id):
@@ -106,7 +105,7 @@ def set_parallel_context(args_opt):
     D.init()
     device_num = D.get_group_size()
     rank = D.get_rank()
-    print("rank_id is {}, device_num is {}".format(rank, device_num))
+    print(f"rank_id is {rank}, device_num is {device_num}")
     context.reset_auto_parallel_context()
     context.set_auto_parallel_context(
         parallel_mode=ParallelMode.SEMI_AUTO_PARALLEL, gradients_mean=False,
@@ -135,12 +134,13 @@ def run_train(args_opt):
         rank, device_num = set_parallel_context(args_opt)
     context.set_context(
         save_graphs=False,
-        save_graphs_path="/cache/graphs_of_device_id_" + str(rank),
+        save_graphs_path=f"/cache/graphs_of_device_id_{str(rank)}",
     )
-    cache_url = '/cache/Data/'
-    eval_cache_url = '/cache/EvalData/'
+
     if not args_opt.offline:
+        cache_url = '/cache/Data/'
         download_data(src_data_url=args_opt.data_url, tgt_data_path=cache_url, rank=rank)
+        eval_cache_url = '/cache/EvalData/'
         download_data(src_data_url=args_opt.eval_data_url, tgt_data_path=eval_cache_url, rank=rank)
     # Set model property
     model_parallel_num = args_opt.op_level_model_parallel_num
@@ -306,11 +306,18 @@ def run_train(args_opt):
         strategy = model.infer_train_layout(train_dataset=ds, sink_size=args_opt.sink_size)
         print("======start load_distributed checkpoint", flush=True)
         # For 2.6B and 13B models, the number of ckpt files is 512.
-        ckpt_file_list = [os.path.join(args_opt.load_ckpt_path, f"filerted_{ckpt_rank}.ckpt") for ckpt_rank in
-                          range(0, 512)]
+        ckpt_file_list = [
+            os.path.join(args_opt.load_ckpt_path, f"filerted_{ckpt_rank}.ckpt")
+            for ckpt_rank in range(512)
+        ]
+
         print(f"Loading from path {ckpt_file_list[0]}", flush=True)
         load_distributed_checkpoint(model.train_network, ckpt_file_list, strategy)
-    print("Dataset size: {}, actual_epoch_num: {}".format(ds.get_dataset_size(), actual_epoch_num), flush=True)
+    print(
+        f"Dataset size: {ds.get_dataset_size()}, actual_epoch_num: {actual_epoch_num}",
+        flush=True,
+    )
+
 
     try:
         model.train(10 if args_opt.profiling else actual_epoch_num, ds, callbacks=callback,
@@ -321,13 +328,18 @@ def run_train(args_opt):
             profiler.analyse()
             rank_id = rank
             if context.get_context("save_graphs"):
-                mox.file.make_dirs("s3://wudao-1/yyf/graphs_" + jobid)
-                mox.file.copy_parallel(src_url="/cache/graphs_of_device_id_" + str(rank_id),
-                                       dst_url="s3://wudao-1/yyf/graphs_" + jobid + "/" + str(rank_id))
+                mox.file.make_dirs(f"s3://wudao-1/yyf/graphs_{jobid}")
+                mox.file.copy_parallel(
+                    src_url=f"/cache/graphs_of_device_id_{str(rank_id)}",
+                    dst_url=f"s3://wudao-1/yyf/graphs_{jobid}/{str(rank_id)}",
+                )
+
             if rank_id % 8 == 0:
-                mox.file.make_dirs("s3://wudao-1/yyf/profiler_" + jobid)
-                mox.file.copy_parallel(src_url="/cache/profiler_data",
-                                       dst_url="s3://wudao-1/yyf/profiler_" + jobid + "/" + str(rank_id))
+                mox.file.make_dirs(f"s3://wudao-1/yyf/profiler_{jobid}")
+                mox.file.copy_parallel(
+                    src_url="/cache/profiler_data",
+                    dst_url=f"s3://wudao-1/yyf/profiler_{jobid}/{str(rank_id)}",
+                )
 
 
 def restore_checkpoint(args_param, sink_size, dataset, model, network, epoch):
@@ -336,7 +348,12 @@ def restore_checkpoint(args_param, sink_size, dataset, model, network, epoch):
     """
     print("======start single checkpoint", flush=True)
     ckpt_name = args_param.ckpt_name_prefix
-    ckpt_pattern = os.path.join(args_param.save_checkpoint_path, "rank_{}".format(D.get_rank()), f"{ckpt_name}*.ckpt")
+    ckpt_pattern = os.path.join(
+        args_param.save_checkpoint_path,
+        f"rank_{D.get_rank()}",
+        f"{ckpt_name}*.ckpt",
+    )
+
     ckpt_all_files = glob.glob(ckpt_pattern)
 
     if not ckpt_all_files:
@@ -345,14 +362,14 @@ def restore_checkpoint(args_param, sink_size, dataset, model, network, epoch):
               f"with pattern {ckpt_pattern}, so skip the loading.")
         return
 
-    ckpt_exp_pattern = os.path.join(args_param.save_checkpoint_path, "rank_{}".format(D.get_rank()),
-                                    f"{ckpt_name}*_breakpoint.ckpt")
-    ckpt_exp_files = glob.glob(ckpt_exp_pattern)
-    ckpt_files = []
-    for file in ckpt_all_files:
-        if file not in ckpt_exp_files:
-            ckpt_files.append(file)
+    ckpt_exp_pattern = os.path.join(
+        args_param.save_checkpoint_path,
+        f"rank_{D.get_rank()}",
+        f"{ckpt_name}*_breakpoint.ckpt",
+    )
 
+    ckpt_exp_files = glob.glob(ckpt_exp_pattern)
+    ckpt_files = [file for file in ckpt_all_files if file not in ckpt_exp_files]
     if not ckpt_files:
         print(f"There is no ckpt file in {args_param.save_checkpoint_path}, "
               f"current ckpt_files found is {ckpt_files} "
@@ -412,14 +429,8 @@ def check_exception_checkpoints(ckpt_file_list):
         ckpt_file_list: exception checkpoints
     Returns: result of exception checkpoints size check.
     """
-    ckpt_size_list = []
-    for ckpt_file in ckpt_file_list:
-        ckpt_size_list.append(os.path.getsize(ckpt_file))
-
-    if len(set(ckpt_size_list)) > 1:
-        return False
-
-    return True
+    ckpt_size_list = [os.path.getsize(ckpt_file) for ckpt_file in ckpt_file_list]
+    return len(set(ckpt_size_list)) <= 1
 
 
 def restore_exception_checkpoint(args_param, sink_size, dataset, model, network, epoch):
@@ -437,12 +448,10 @@ def restore_exception_checkpoint(args_param, sink_size, dataset, model, network,
     if os.getenv("RESTORE_RANKS") == "-1":
         return False
 
-    ckpt_file_list = get_exception_checkpoints(args_param)
-
-    restore_flag = False
-    if ckpt_file_list:
+    if ckpt_file_list := get_exception_checkpoints(args_param):
         restore_flag = check_exception_checkpoints(ckpt_file_list)
-
+    else:
+        restore_flag = False
     if not restore_flag:
         return False
 
@@ -491,7 +500,7 @@ def set_pipeline_parallel_context(args_opt):
     D.init()
     device_num = D.get_group_size()
     rank_id = D.get_rank()
-    print("rank_id is {}, device_num is {}".format(rank_id, device_num))
+    print(f"rank_id is {rank_id}, device_num is {device_num}")
     context.reset_auto_parallel_context()
     context.set_auto_parallel_context(
         parallel_mode=ParallelMode.SEMI_AUTO_PARALLEL, gradients_mean=False,
@@ -518,10 +527,10 @@ def run_train_pipeline(args_opt):
     if args_opt.distribute == "true":
         rank_id, device_num = set_pipeline_parallel_context(args_opt)
 
-    # copy data from the cloud to the /cache/Data
-    cache_url = '/cache/Data/'
     eval_cache_url = '/cache/EvalData/'
     if not args_opt.offline:
+        # copy data from the cloud to the /cache/Data
+        cache_url = '/cache/Data/'
         download_data(src_data_url=args_opt.data_url, tgt_data_path=cache_url, rank=rank_id)
         download_data(src_data_url=args_opt.eval_data_url, tgt_data_path=eval_cache_url, rank=rank_id)
     model_parallel_num = args_opt.op_level_model_parallel_num

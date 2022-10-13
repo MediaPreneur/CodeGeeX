@@ -83,23 +83,20 @@ class CodeGeeXModel(MegatronModule):
 
         if labels is None:
             return output
-        else:
-            if self.fp16_lm_cross_entropy:
-                assert output.dtype == torch.half
-                loss = mpu.vocab_parallel_cross_entropy(output, labels)
-            else:
-                loss = mpu.vocab_parallel_cross_entropy(output.float(), labels)
+        if not self.fp16_lm_cross_entropy:
+            return mpu.vocab_parallel_cross_entropy(output.float(), labels)
 
-            return loss
+        assert output.dtype == torch.half
+        return mpu.vocab_parallel_cross_entropy(output, labels)
 
     def state_dict_for_save_checkpoint(self, destination=None, prefix='',
                                        keep_vars=False):
 
-        state_dict_ = {}
-        state_dict_[self._language_model_key] \
-            = self.language_model.state_dict_for_save_checkpoint(
-            destination, prefix, keep_vars)
-        return state_dict_
+        return {
+            self._language_model_key: self.language_model.state_dict_for_save_checkpoint(
+                destination, prefix, keep_vars
+            )
+        }
 
     def load_state_dict(self, state_dict, strict=True):
         """Customized load."""

@@ -63,7 +63,7 @@ def set_parallel_context(args_opt):
     D.init()
     device_num = D.get_group_size()
     rank = D.get_rank()
-    print("rank_id is {}, device_num is {}".format(rank, device_num))
+    print(f"rank_id is {rank}, device_num is {device_num}")
     context.reset_auto_parallel_context()
     context.set_auto_parallel_context(
         parallel_mode=ParallelMode.SEMI_AUTO_PARALLEL, gradients_mean=False,
@@ -77,7 +77,7 @@ def set_parallel_context(args_opt):
 
 def download_ckpt(args_opt, file_num, rank_num, rank_id):
     ckpt_list = []
-    for rank in range(0, file_num):
+    for rank in range(file_num):
         ckpt_name = f"code-13B{rank}_22-{args_opt.load_ckpt_epoch}_2.ckpt"
         local_file = os.path.join(args_opt.save_checkpoint_path, f"origin_rank_{rank}", ckpt_name)
         ckpt_list.append(local_file)
@@ -102,7 +102,11 @@ def get_needed_opt_shard_list(train_strategy_file, self_rank):
         if opt_weight_shard_size <= 0:
             continue
         group_index = self_rank % opt_weight_shard_step
-        current_needed_ckpt_ranks = [group_index + i * opt_weight_shard_step for i in range(0, opt_weight_shard_size)]
+        current_needed_ckpt_ranks = [
+            group_index + i * opt_weight_shard_step
+            for i in range(opt_weight_shard_size)
+        ]
+
         if len(current_needed_ckpt_ranks) > len(needed_ckpt_ranks):
             needed_ckpt_ranks = current_needed_ckpt_ranks
     return needed_ckpt_ranks
@@ -123,11 +127,10 @@ def transform_opt_shard(restore_local_ckpt_file_list, train_strategy_file, save_
     train_strategy_origin = build_searched_strategy(train_strategy_file)
     strategy_keys = list(train_strategy_origin.keys())
     merged_param_list = []
-    for param_name in param_total_dict.keys():
+    for param_name, value in param_total_dict.items():
         if param_name not in strategy_keys:
-            each_param = {"name": param_name}
-            each_param["data"] = param_total_dict[param_name][0]
-            print("====", param_name, param_total_dict[param_name][0].data.asnumpy().shape, flush=True)
+            each_param = {"name": param_name, "data": param_total_dict[param_name][0]}
+            print("====", param_name, value[0].data.asnumpy().shape, flush=True)
             merged_param_list.append(each_param)
             continue
         opt_weight_shard_size = train_strategy_origin[param_name].opt_weight_shard_size
@@ -142,8 +145,7 @@ def transform_opt_shard(restore_local_ckpt_file_list, train_strategy_file, save_
         print("====do opt shard:", param_name)
         sliced_params = [param_total_dict[param_name][i] for i in range(len(param_total_dict[param_name]))]
         merged_param = merge_sliced_parameter(sliced_params, None)
-        each_param = {"name": param_name}
-        each_param["data"] = merged_param
+        each_param = {"name": param_name, "data": merged_param}
         print("====", param_name, merged_param.data.asnumpy().shape, flush=True)
         merged_param_list.append(each_param)
     save_file = os.path.join(save_path, "predict.ckpt")
@@ -178,7 +180,7 @@ def run_transform_opt_shard_ckpt(args_opt):
         mox.file.make_dirs(rank_obs_save_path)
     rank_obs_save_file = os.path.join(rank_obs_save_path, f"code-13B{rank}-{args_opt.load_ckpt_epoch}.ckpt")
     if not os.path.exists(save_file):
-        raise ValueError(save_file + " not exists")
+        raise ValueError(f"{save_file} not exists")
     mox.file.copy(save_file, rank_obs_save_file)
     print("=====save ok, save_path", save_path)
 

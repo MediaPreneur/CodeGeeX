@@ -18,10 +18,7 @@ from codegeex.megatron.model import CodeGeeXModel
 def model_provider():
     """Build the model."""
 
-    model = CodeGeeXModel(num_tokentypes=0,
-                          parallel_output=False)
-
-    return model
+    return CodeGeeXModel(num_tokentypes=0, parallel_output=False)
 
 
 def set_random_seed(seed):

@@ -81,15 +81,13 @@ def initialize_model_parallel(
     """
     if torch.distributed.get_rank() == 0:
         print(
-            "> initializing tensor model parallel with size {}".format(
-                tensor_model_parallel_size_
-            )
+            f"> initializing tensor model parallel with size {tensor_model_parallel_size_}"
         )
+
         print(
-            "> initializing pipeline model parallel with size {}".format(
-                pipeline_model_parallel_size_
-            )
+            f"> initializing pipeline model parallel with size {pipeline_model_parallel_size_}"
         )
+
     # Get world size and rank. Ensure some consistencies.
     assert torch.distributed.is_initialized()
     world_size = torch.distributed.get_world_size()
@@ -172,10 +170,7 @@ def initialize_model_parallel(
             _PIPELINE_GLOBAL_RANKS = ranks
         # Setup embedding group (to exchange gradients between
         # first and last stages).
-        if len(ranks) > 1:
-            embedding_ranks = [ranks[0], ranks[-1]]
-        else:
-            embedding_ranks = ranks
+        embedding_ranks = [ranks[0], ranks[-1]] if len(ranks) > 1 else ranks
         group = torch.distributed.new_group(embedding_ranks)
         if rank in embedding_ranks:
             _EMBEDDING_GROUP = group
@@ -183,13 +178,11 @@ def initialize_model_parallel(
 
 def model_parallel_is_initialized():
     """Check if model and data parallel groups are initialized."""
-    if (
-        _TENSOR_MODEL_PARALLEL_GROUP is None
-        or _PIPELINE_MODEL_PARALLEL_GROUP is None
-        or _DATA_PARALLEL_GROUP is None
-    ):
-        return False
-    return True
+    return (
+        _TENSOR_MODEL_PARALLEL_GROUP is not None
+        and _PIPELINE_MODEL_PARALLEL_GROUP is not None
+        and _DATA_PARALLEL_GROUP is not None
+    )
 
 
 def get_model_parallel_group():
@@ -298,12 +291,11 @@ def get_pipeline_model_parallel_rank():
 
 def is_pipeline_first_stage(ignore_virtual=False):
     """Return True if in the first pipeline model-parallel stage, False otherwise."""
-    if not ignore_virtual:
-        if (
-            get_virtual_pipeline_model_parallel_world_size() is not None
-            and get_virtual_pipeline_model_parallel_rank() != 0
-        ):
-            return False
+    if not ignore_virtual and (
+        get_virtual_pipeline_model_parallel_world_size() is not None
+        and get_virtual_pipeline_model_parallel_rank() != 0
+    ):
+        return False
     return get_pipeline_model_parallel_rank() == 0
 
 

@@ -50,9 +50,7 @@ def _split(input_):
 
     # Note: torch.split does not create contiguous tensors by default.
     rank = get_tensor_model_parallel_rank()
-    output = input_list[rank].contiguous()
-
-    return output
+    return input_list[rank].contiguous()
 
 
 def _gather(input_):
@@ -73,10 +71,7 @@ def _gather(input_):
         tensor_list, input_, group=get_tensor_model_parallel_group()
     )
 
-    # Note: torch.cat already creates a contiguous tensor.
-    output = torch.cat(tensor_list, dim=last_dim).contiguous()
-
-    return output
+    return torch.cat(tensor_list, dim=last_dim).contiguous()
 
 
 class _CopyToModelParallelRegion(torch.autograd.Function):

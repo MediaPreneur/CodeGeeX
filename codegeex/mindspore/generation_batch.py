@@ -51,7 +51,7 @@ def load_model(args_opt):
         D.init()
         device_num = D.get_group_size()
         rank = D.get_rank()
-        print("rank_id is {}, device_num is {}".format(rank, device_num))
+        print(f"rank_id is {rank}, device_num is {device_num}")
         context.reset_auto_parallel_context()
         context.set_auto_parallel_context(
             parallel_mode=ParallelMode.SEMI_AUTO_PARALLEL,
@@ -71,10 +71,11 @@ def load_model(args_opt):
             strategy_ckpt_load_file=args_opt.strategy_load_ckpt_path)
     context.set_context(
         save_graphs=False,
-        save_graphs_path="/cache/graphs_of_device_id_" + str(rank),
+        save_graphs_path=f"/cache/graphs_of_device_id_{str(rank)}",
     )
+
     use_past = (args_opt.use_past == "true")
-    print('local_rank:{}, start to run...'.format(rank), flush=True)
+    print(f'local_rank:{rank}, start to run...', flush=True)
     if args_opt.export:
         use_past = True
     # Set model property
@@ -143,9 +144,12 @@ def load_model(args_opt):
         print("==============save_graph", flush=True)
         jobid = os.environ["BATCH_JOB_ID"]
         rank_id = rank
-        mox.file.make_dirs("s3://wudao-1/yyf/graphs_" + jobid)
-        mox.file.copy_parallel(src_url="/cache/graphs_of_device_id_" + str(rank_id),
-                               dst_url="s3://wudao-1/yyf/graphs_" + jobid + "/" + str(rank_id))
+        mox.file.make_dirs(f"s3://wudao-1/yyf/graphs_{jobid}")
+        mox.file.copy_parallel(
+            src_url=f"/cache/graphs_of_device_id_{str(rank_id)}",
+            dst_url=f"s3://wudao-1/yyf/graphs_{jobid}/{str(rank_id)}",
+        )
+
     print("======start load_distributed checkpoint", flush=True)
     if args_opt.load_ckpt_epoch > 0:
         time.sleep(rank * 0.1)
@@ -263,12 +267,11 @@ def run_predict(model_predict, config, args_opt, rank):
                     print(out, flush=True)
                     generations.append(out)
                     if rank == 0:
-                        f = open(save_path, 'a')
-                        f.write(generations[-1])
-                        f.close()
+                        with open(save_path, 'a') as f:
+                            f.write(generations[-1])
             sample_ids = []
     if len(batch) > 0:
-        for j in range(batch_size - len(sample_ids)):
+        for _ in range(batch_size - len(sample_ids)):
             batch.append(np.zeros((1, 1)))
             input_length.append(-1)
         valid_length = max(input_length)
@@ -290,9 +293,8 @@ def run_predict(model_predict, config, args_opt, rank):
                 print(out, flush=True)
                 generations.append(out)
                 if rank == 0:
-                    f = open(save_path, 'a')
-                    f.write(generations[-1])
-                    f.close()
+                    with open(save_path, 'a') as f:
+                        f.write(generations[-1])
 
 
 def main():
